@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package ftshp.connect.test;
+
+message EchoRequest {
+  string text = 1;
+  int64 big = 2;
+  bytes blob = 3;
+}
+
+message EchoResponse {
+  string text = 1;
+  map<string, string> headers = 2;
+}
+
+message FailRequest {
+  string code = 1;
+  string message = 2;
+  bool with_detail = 3;
+}
+
+message Empty {}
+
+service Echo {
+  // Echo returns the text upper-cased.
+  rpc Echo(EchoRequest) returns (EchoResponse);
+  rpc Peek(EchoRequest) returns (EchoResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc Fail(FailRequest) returns (Empty);
+  rpc Watch(EchoRequest) returns (stream EchoResponse);
+}

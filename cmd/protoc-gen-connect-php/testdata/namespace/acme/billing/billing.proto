@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package acme.billing.v1;
+
+option php_namespace = "Acme\\Billing";
+option php_class_prefix = "PB";
+
+import "acme/common/types.proto";
+
+message Invoice {
+  string id = 1;
+}
+
+service Billing {
+  // Charge bills the amount.
+  //
+  // The amount is in minor units.
+  rpc Charge(acme.common.Money) returns (Invoice);
+  rpc Lookup(acme.common.Context) returns (Invoice) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+service Ledger {}

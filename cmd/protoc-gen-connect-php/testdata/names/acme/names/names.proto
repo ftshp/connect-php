@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package acme.names;
+
+message Class {}
+
+message Outer {
+  message Inner {}
+}
+
+service Warehouse {
+  rpc WMSCheck(Class) returns (Outer.Inner);
+  // Old returns nothing useful.
+  rpc Old(Class) returns (Class) {
+    option deprecated = true;
+  }
+}
