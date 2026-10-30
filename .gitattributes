@@ -1,0 +1,18 @@
+* text=auto eol=lf
+
+/.github export-ignore
+/tests export-ignore
+/conformance export-ignore
+/cmd export-ignore
+/docs export-ignore
+/.editorconfig export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/phpunit.xml.dist export-ignore
+/phpstan.neon.dist export-ignore
+/.php-cs-fixer.dist.php export-ignore
+/Makefile export-ignore
+/go.mod export-ignore
+/go.sum export-ignore
+/.goreleaser.yaml export-ignore
+/composer-dependency-analyser.php export-ignore

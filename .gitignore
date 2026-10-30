@@ -1,0 +1,13 @@
+/vendor/
+/composer.lock
+/.phpunit.cache/
+/.php-cs-fixer.cache
+/build/
+/dist/
+/conformance/vendor/
+/conformance/gen/
+/conformance/composer.lock
+/CLAUDE.local.md
+/.claude/
+/docs/superpowers/
+/.superpowers/
