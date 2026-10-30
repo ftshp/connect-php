@@ -6,12 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## Unreleased
 
+## 0.1.0 - 2026-10-30
+
 ### Added
 
-- PSR-18 `Client` for unary Connect calls with the `proto` and `json` codecs, gzip, GET for `NO_SIDE_EFFECTS` methods, timeouts and a response size limit.
-- PSR-15 `Server` that serves any number of services from their generated interfaces, with request size limits, timeout parsing and the Connect error format.
-- `ConnectException`, `Code` and `ErrorDetail` for errors with typed details.
-- `Interceptor` for code that wraps calls on the client and on the server.
-- `Context` and `Headers` for request and response headers, trailers and deadlines.
-- `protoc-gen-connect-php`, a protoc plugin that generates a service interface and a client, released as binaries for Linux, macOS and Windows.
-- Conformance runners for the Connect conformance suite in server and client mode.
+- Client: a PSR-18 `Client` for unary Connect calls with GET for `NO_SIDE_EFFECTS` methods, timeouts and a response size limit.
+- Server: a PSR-15 `Server` that serves any number of services from their generated interfaces, with request size limits and timeout parsing.
+- Generated code and the plugin: `protoc-gen-connect-php` generates a service interface and a client, released as binaries for Linux, macOS and Windows.
+- Codecs and compression: the `proto` and `json` codecs and gzip.
+- Interceptors: `Interceptor` wraps calls on the client and on the server, with `Context` and `Headers` for headers, trailers and deadlines.
+- Errors and details: `ConnectException`, `Code` and `ErrorDetail` for errors in the Connect format with typed details.
+- Conformance: runners for the Connect conformance suite in server and client mode. The server passes 172 of 172 cases and the client 180 of 184.
+- Documentation: a README and guides for migrating from TwirPHP and for Symfony.
+
+### Known limitations
+
+- Only unary calls are supported, there is no streaming.
+- gRPC and gRPC-Web are not supported.
+- A synchronous PSR-18 client cannot cancel a call that is in flight.
+- Four `cancel-after-close-send` conformance cases fail for that reason.
