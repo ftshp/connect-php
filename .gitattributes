@@ -16,3 +16,6 @@
 /go.sum export-ignore
 /.goreleaser.yaml export-ignore
 /composer-dependency-analyser.php export-ignore
+/infection.json5 export-ignore
+/buf.yaml export-ignore
+/buf.gen.yaml export-ignore
