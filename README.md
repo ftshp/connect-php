@@ -11,7 +11,7 @@ This is an unofficial, community implementation of the Connect protocol. It is n
 | `proto` and `json` codecs | yes | yes |
 | gzip compression | yes | yes |
 | GET for `NO_SIDE_EFFECTS` methods | opt-in | yes |
-| Timeouts (`Connect-Timeout-Ms`) | sent | parsed and clamped |
+| Timeouts (`Connect-Timeout-Ms`) | sent | parsed, with an optional cap |
 | Headers, trailers and error details | yes | yes |
 | Interceptors | yes | yes |
 | Streaming RPCs | no | no |
@@ -239,7 +239,7 @@ $etag = $context->responseHeaders->get('etag');
 
 On the server the handler gets the same class. It reads what the client sent and sets `$context->responseHeaders` and `$context->responseTrailers`. `$context->remainingMs()` returns the time left before the deadline from `Connect-Timeout-Ms`, or `null` when the client sent none.
 
-`Client` takes options as named arguments: `codec: new JsonCodec()`, `compression: new Gzip()` to compress requests, `useGet: true` to send `NO_SIDE_EFFECTS` calls as GET, `timeoutMs`, `maxResponseBytes`, `interceptors` and a path `prefix`. `Server` takes `interceptors`, `compression`, `compressMinBytes`, `maxRequestBytes`, `maxTimeoutMs`, `requireProtocolHeader` and `prefix`. Both sides limit messages to 4 MiB by default, counting the raw and the decompressed body.
+`Client` takes options as named arguments: `codec: new JsonCodec()`, `compression: new Gzip()` to compress requests, `acceptCompression` for the encodings accepted on responses, `useGet: true` to send `NO_SIDE_EFFECTS` calls as GET, `timeoutMs`, `maxResponseBytes`, `interceptors` and a path `prefix`. `Server` takes `interceptors`, `compression`, `compressMinBytes`, `maxRequestBytes`, `maxTimeoutMs`, `requireProtocolHeader` and `prefix`. Both sides limit messages to 4 MiB by default, counting the raw and the decompressed body.
 
 ## Errors
 
@@ -365,10 +365,10 @@ make conformance
 
 [CONTRIBUTING.md](CONTRIBUTING.md) explains how to propose a change. Run `make check` before you open a pull request. Report security problems as described in [SECURITY.md](SECURITY.md).
 
-`.github/workflows/mirror.yml` pushes `main` and tags to `git.footshop.cz/pkgs/php/connect-php` after every push. It reads the target from the `GITLAB_MIRROR_URL` repository secret, which holds `https://oauth2:<token>@git.footshop.cz/pkgs/php/connect-php.git`, and skips the push when the secret is empty.
+`.github/workflows/mirror.yml` pushes `main` and tags to `git.footshop.cz/pkgs/php/connect-php` whenever `main` or a `v*` tag is pushed. It reads the target from the `GITLAB_MIRROR_URL` repository secret, which holds `https://oauth2:<token>@git.footshop.cz/pkgs/php/connect-php.git`, and skips the push when the secret is empty.
 
 ## Legal
 
 Copyright 2026 Footshop a.s. Licensed under the Apache License 2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-Connect is a project of the Connect authors. This project uses the name only to describe the protocol it implements.
+Connect is a project of the Connect authors; this project uses the name only to describe the protocol it implements.
