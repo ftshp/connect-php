@@ -11,6 +11,7 @@ use Ftshp\Connect\Compression\Gzip;
 use Ftshp\Connect\Internal\Chain;
 use Ftshp\Connect\Internal\ContentType;
 use Ftshp\Connect\Internal\ErrorBody;
+use Ftshp\Connect\Internal\GetQuery;
 use Google\Protobuf\Internal\Message;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
@@ -30,6 +31,7 @@ final class Client
      * @param ?Compression $compression compresses request bodies
      * @param list<Compression> $acceptCompression accepted on responses
      * @param list<Interceptor> $interceptors first is outermost
+     * @param bool $useGet send NoSideEffects methods as GET
      * @param ?int $timeoutMs default per call, overridden by the Context
      * @param int $maxResponseBytes limit on raw and decompressed response bodies, 0 for none
      */
@@ -42,6 +44,7 @@ final class Client
         private readonly ?Compression $compression = null,
         array $acceptCompression = [new Gzip()],
         private readonly array $interceptors = [],
+        private readonly bool $useGet = false,
         private readonly ?int $timeoutMs = null,
         private readonly int $maxResponseBytes = 4194304,
         private readonly string $prefix = '',
@@ -95,12 +98,21 @@ final class Client
     private function buildRequest(UnaryRequest $unary): RequestInterface
     {
         $context = $unary->context;
-        $request = $this->requestFactory->createRequest('POST', rtrim($this->baseUrl, '/') . $this->prefix . $unary->method->procedure());
+        $body = $this->codec->encode($unary->message());
+        $compression = $body === '' ? null : $this->compression;
+        if ($compression !== null) {
+            $body = $compression->compress($body);
+        }
+        $url = rtrim($this->baseUrl, '/') . $this->prefix . $unary->method->procedure();
+        $get = $this->useGet && $unary->method->idempotency === Idempotency::NoSideEffects;
+        $request = $get
+            ? $this->requestFactory->createRequest('GET', $url . '?' . GetQuery::encode($this->codec->name(), $body, $compression?->name()))
+            : $this->requestFactory->createRequest('POST', $url);
         foreach ($context->requestHeaders->toArray() as $name => $values) {
             $request = $request->withHeader((string) $name, $values);
         }
         $request = $request
-            ->withHeader('Content-Type', 'application/' . $this->codec->name())
+            ->withoutHeader('Content-Encoding')
             ->withHeader('Connect-Protocol-Version', '1');
         if ($this->acceptCompression !== []) {
             $request = $request->withHeader('Accept-Encoding', implode(', ', array_keys($this->acceptCompression)));
@@ -108,15 +120,14 @@ final class Client
         if ($context->timeoutMs !== null) {
             $request = $request->withHeader('Connect-Timeout-Ms', (string) $context->timeoutMs);
         }
-
-        $request = $request->withoutHeader('Content-Encoding');
-        $body = $this->codec->encode($unary->message());
-        if ($this->compression !== null && $body !== '') {
-            $body = $this->compression->compress($body);
-            $request = $request->withHeader('Content-Encoding', $this->compression->name());
+        if ($get) {
+            return $request->withoutHeader('Content-Type');
         }
+        $request = $request
+            ->withHeader('Content-Type', 'application/' . $this->codec->name())
+            ->withBody($this->streamFactory->createStream($body));
 
-        return $request->withBody($this->streamFactory->createStream($body));
+        return $compression === null ? $request : $request->withHeader('Content-Encoding', $compression->name());
     }
 
     private function readResponse(ResponseInterface $response, UnaryRequest $unary): Message
