@@ -411,6 +411,33 @@ final class ServerTest extends TestCase
     }
 
     #[Test]
+    public function handlerSetBodyHeadersAreNotEmitted(): void
+    {
+        $copy = new class implements Interceptor {
+            #[\Override]
+            public function intercept(UnaryRequest $request, \Closure $next): Message
+            {
+                $request->context->responseHeaders->set('content-encoding', 'br');
+                $request->context->responseHeaders->set('content-length', '999');
+                $request->context->responseHeaders->set('transfer-encoding', 'chunked');
+                $request->context->responseHeaders->set('x-kept', '1');
+
+                return $next($request);
+            }
+        };
+        $server = $this->server([$copy]);
+
+        foreach ([self::ECHO, '/ftshp.connect.test.Echo/Fail'] as $path) {
+            $response = $this->post($path, 'application/proto', $this->proto('hello'), server: $server);
+
+            self::assertFalse($response->hasHeader('content-encoding'), $path);
+            self::assertFalse($response->hasHeader('content-length'), $path);
+            self::assertFalse($response->hasHeader('transfer-encoding'), $path);
+            self::assertSame('1', $response->getHeaderLine('x-kept'), $path);
+        }
+    }
+
+    #[Test]
     public function interceptorsRunOuterToInnerAndSeeOriginalException(): void
     {
         $seen = new \ArrayObject();

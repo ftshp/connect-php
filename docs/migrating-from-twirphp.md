@@ -53,6 +53,23 @@ $stock->availabilityGet($request, new Context(new Headers(['authorization' => 'B
 
 A server implementation reads request headers from `$context->requestHeaders` and sets response headers with `$context->responseHeaders->set()` instead of `Twirp\Context::withHttpResponseHeader()`.
 
+twirphp code often passes the incoming `$ctx` on to the next client call. A connect-php `Context` belongs to one call, so a handler that calls another service builds a new one with the headers it means to forward and the time that is left:
+
+```php
+public function availabilityGet(AvailabilityGetRequest $request, Context $context): AvailabilityGetResponse
+{
+    $forwarded = new Context(
+        new Headers(['authorization' => $context->requestHeaders->get('authorization') ?? '']),
+        timeoutMs: $context->remainingMs(),
+    );
+    $stock = $this->warehouse->stockGet(new StockGetRequest(['sku' => $request->getSku()]), $forwarded);
+
+    return new AvailabilityGetResponse(['quantity' => $stock->getQuantity()]);
+}
+```
+
+Reusing the incoming `Context` would send every header the caller sent on to the other service, and the downstream response headers would replace the ones the handler had set.
+
 ## Clients
 
 The twirphp client takes the address and the PSR-18 client directly. The connect-php client wraps a `Client` that holds the transport settings:

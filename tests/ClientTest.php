@@ -414,11 +414,34 @@ final class ClientTest extends TestCase
     }
 
     #[Test]
-    public function userContentEncodingIsDroppedFromUncompressedRequest(): void
+    public function transportHeadersFromTheContextAreNotSent(): void
     {
-        $this->call($this->client(self::ok('HI')), 'hi', new Context(new Headers(['content-encoding' => 'gzip'])));
+        $context = new Context(new Headers([
+            'host' => 'evil.test',
+            'content-length' => '999',
+            'transfer-encoding' => 'chunked',
+            'connection' => 'close',
+            'te' => 'trailers',
+            'content-encoding' => 'gzip',
+            'x-kept' => '1',
+        ]));
 
-        self::assertFalse($this->sentRequest()->hasHeader('Content-Encoding'));
+        $this->call($this->client(self::ok('HI')), 'hi', $context);
+
+        $request = $this->sentRequest();
+        self::assertSame('api.test', $request->getHeaderLine('Host'));
+        foreach (['Content-Length', 'Transfer-Encoding', 'Connection', 'TE', 'Content-Encoding'] as $name) {
+            self::assertFalse($request->hasHeader($name), $name);
+        }
+        self::assertSame('1', $request->getHeaderLine('x-kept'));
+    }
+
+    #[Test]
+    public function compressedRequestKeepsItsOwnContentEncoding(): void
+    {
+        $this->call($this->client(self::ok('HI'), compression: new Gzip()), 'hi', new Context(new Headers(['content-encoding' => 'br'])));
+
+        self::assertSame(['gzip'], $this->sentRequest()->getHeader('Content-Encoding'));
     }
 
     #[Test]

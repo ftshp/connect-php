@@ -239,6 +239,18 @@ $etag = $context->responseHeaders->get('etag');
 
 On the server the handler gets the same class. It reads what the client sent and sets `$context->responseHeaders` and `$context->responseTrailers`. `$context->remainingMs()` returns the time left before the deadline from `Connect-Timeout-Ms`, or `null` when the client sent none.
 
+A `Context` belongs to one call. A handler that calls another service builds a new `Context` for that call, copies the headers it means to forward and passes on the time that is left:
+
+```php
+$downstream = new Context(
+    new Headers(['x-request-id' => $context->requestHeaders->get('x-request-id') ?? '']),
+    timeoutMs: $context->remainingMs(),
+);
+$response = $greeter->greet(new GreetRequest(['name' => 'Jane']), $downstream);
+```
+
+The client never sends `host`, `content-length`, `transfer-encoding`, `connection`, `te` or `content-encoding` from a `Context`. The server drops `content-encoding`, `content-length` and `transfer-encoding` from the response headers a handler sets, because it encodes the body itself.
+
 `Client` takes options as named arguments: `codec: new JsonCodec()`, `compression: new Gzip()` to compress requests, `acceptCompression` for the encodings accepted on responses, `useGet: true` to send `NO_SIDE_EFFECTS` calls as GET, `timeoutMs`, `maxResponseBytes`, `interceptors` and a path `prefix`. `Server` takes `interceptors`, `compression`, `compressMinBytes`, `maxRequestBytes`, `maxTimeoutMs`, `requireProtocolHeader` and `prefix`. Both sides limit messages to 4 MiB by default, counting the raw and the decompressed body.
 
 ## Errors

@@ -23,6 +23,8 @@ use Psr\Http\Server\RequestHandlerInterface;
 
 final class Server implements RequestHandlerInterface
 {
+    private const array BODY_HEADERS = ['content-encoding', 'content-length', 'transfer-encoding'];
+
     /** @var array<string, array{MethodDescriptor<Message, Message>, \Closure(Message, Context): Message}> */
     private array $procedures = [];
 
@@ -230,7 +232,9 @@ final class Server implements RequestHandlerInterface
     private function withMetadata(ResponseInterface $response, Context $context): ResponseInterface
     {
         foreach ($context->responseHeaders->toArray() as $name => $values) {
-            $response = $response->withHeader((string) $name, $values);
+            if (!\in_array((string) $name, self::BODY_HEADERS, true)) {
+                $response = $response->withHeader((string) $name, $values);
+            }
         }
         foreach ($context->responseTrailers->toArray() as $name => $values) {
             $response = $response->withHeader('trailer-' . $name, $values);
