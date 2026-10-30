@@ -109,6 +109,7 @@ final class Client
             $request = $request->withHeader('Connect-Timeout-Ms', (string) $context->timeoutMs);
         }
 
+        $request = $request->withoutHeader('Content-Encoding');
         $body = $this->codec->encode($unary->message());
         if ($this->compression !== null && $body !== '') {
             $body = $this->compression->compress($body);
@@ -135,33 +136,40 @@ final class Client
 
         $body = $this->readBody($response->getBody());
         $contentType = $response->getHeaderLine('Content-Type');
+        $encoding = strtolower(trim($response->getHeaderLine('Content-Encoding')));
+        $compression = $encoding === '' || $encoding === 'identity' ? null : $this->acceptCompression[$encoding] ?? false;
         if ($response->getStatusCode() !== 200) {
             foreach ($trailers as $name => $values) {
                 $headers[$name] = [...$headers[$name] ?? [], ...$values];
             }
+            $metadata = Headers::fromPsr($headers);
 
-            throw $this->error($response->getStatusCode(), $contentType, $body, Headers::fromPsr($headers));
+            throw $compression === false
+                ? $this->statusError($response->getStatusCode(), $body, $metadata)
+                : $this->error($response->getStatusCode(), $contentType, $this->decompress($body, $compression), $metadata);
         }
         if (ContentType::mediaType($contentType) !== 'application/' . $this->codec->name()) {
             throw new ConnectException(Code::Internal, \sprintf('unexpected content type "%s"', $contentType));
         }
-
-        $encoding = strtolower(trim($response->getHeaderLine('Content-Encoding')));
-        if ($encoding !== '' && $encoding !== 'identity') {
-            $compression = $this->acceptCompression[$encoding]
-                ?? throw new ConnectException(Code::Internal, \sprintf('unknown compression "%s"', $encoding));
-            if ($body !== '') {
-                $body = $compression->decompress($body, $this->maxResponseBytes);
-            }
+        if ($compression === false) {
+            throw new ConnectException(Code::Internal, \sprintf('unknown compression "%s"', $encoding));
         }
 
-        return $this->codec->decode($body, $unary->method->output);
+        return $this->codec->decode($this->decompress($body, $compression), $unary->method->output);
+    }
+
+    private function decompress(string $body, ?Compression $compression): string
+    {
+        return $compression === null || $body === '' ? $body : $compression->decompress($body, $this->maxResponseBytes);
     }
 
     private function readBody(StreamInterface $stream): string
     {
         if ($this->maxResponseBytes <= 0) {
             return (string) $stream;
+        }
+        if ($stream->isSeekable()) {
+            $stream->rewind();
         }
         $body = '';
         while (!$stream->eof()) {
@@ -182,7 +190,12 @@ final class Client
     {
         $error = ContentType::mediaType($contentType) === 'application/json' ? ErrorBody::decode($body, $metadata) : null;
 
-        return $error ?? new ConnectException(Code::fromHttpStatus($status), 'HTTP ' . $status . ($body !== '' ? ': ' . $body : ''))
+        return $error ?? $this->statusError($status, $body, $metadata);
+    }
+
+    private function statusError(int $status, string $body, Headers $metadata): ConnectException
+    {
+        return new ConnectException(Code::fromHttpStatus($status), 'HTTP ' . $status . ($body !== '' ? ': ' . $body : ''))
             ->withMetadata($metadata);
     }
 }

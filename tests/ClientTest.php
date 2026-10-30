@@ -181,6 +181,35 @@ final class ClientTest extends TestCase
     }
 
     #[Test]
+    public function gzipResponseInflatingPastLimitIsResourceExhausted(): void
+    {
+        $body = new Gzip()->compress(new EchoResponse(['text' => str_repeat('a', 1000)])->serializeToString());
+        $client = $this->client(self::respond(200, $body, ['Content-Type' => 'application/proto', 'Content-Encoding' => 'gzip']), maxResponseBytes: 100);
+
+        self::assertLessThan(100, \strlen($body));
+        self::assertSame(Code::ResourceExhausted, $this->callError($client)->code());
+    }
+
+    #[Test]
+    public function identityContentEncodingIsDecoded(): void
+    {
+        self::assertSame('HI', $this->call($this->client(self::ok('HI', ['Content-Encoding' => 'identity'])))->getText());
+    }
+
+    #[Test]
+    public function partlyReadSeekableResponseIsRewound(): void
+    {
+        $client = $this->client(static function (RequestInterface $request): ResponseInterface {
+            $response = new Response(200, ['Content-Type' => 'application/proto'], new EchoResponse(['text' => 'HI'])->serializeToString());
+            $response->getBody()->getContents();
+
+            return $response;
+        });
+
+        self::assertSame('HI', $this->call($client)->getText());
+    }
+
+    #[Test]
     public function responseOverLimitIsResourceExhausted(): void
     {
         $client = $this->client(self::ok(str_repeat('a', 100)), maxResponseBytes: 50);
@@ -217,6 +246,29 @@ final class ClientTest extends TestCase
         self::assertSame('no such thing', $e->getMessage());
         self::assertCount(1, $e->details());
         self::assertSame('1', $e->metadata()->get('x-err'));
+    }
+
+    #[Test]
+    public function gzipConnectErrorIsParsed(): void
+    {
+        $body = new Gzip()->compress(ErrorBody::encode(new ConnectException(Code::NotFound, 'no such thing')));
+        $client = $this->client(self::respond(404, $body, ['Content-Type' => 'application/json', 'Content-Encoding' => 'gzip']));
+
+        $e = $this->callError($client);
+
+        self::assertSame(Code::NotFound, $e->code());
+        self::assertSame('no such thing', $e->getMessage());
+    }
+
+    #[Test]
+    public function errorWithUnknownContentEncodingFallsBackToStatus(): void
+    {
+        $client = $this->client(self::respond(404, 'xx', ['Content-Type' => 'application/json', 'Content-Encoding' => 'br']));
+
+        $e = $this->callError($client);
+
+        self::assertSame(Code::Unimplemented, $e->code());
+        self::assertSame('HTTP 404: xx', $e->getMessage());
     }
 
     #[Test]
@@ -331,6 +383,14 @@ final class ClientTest extends TestCase
         $request = $this->sentRequest();
         self::assertFalse($request->hasHeader('Content-Encoding'));
         self::assertSame('', (string) $request->getBody());
+    }
+
+    #[Test]
+    public function userContentEncodingIsDroppedFromUncompressedRequest(): void
+    {
+        $this->call($this->client(self::ok('HI')), 'hi', new Context(new Headers(['content-encoding' => 'gzip'])));
+
+        self::assertFalse($this->sentRequest()->hasHeader('Content-Encoding'));
     }
 
     #[Test]
