@@ -6,3 +6,4 @@ parameters:
         - src
     scanDirectories:
         - gen
+        - vendor/guzzlehttp

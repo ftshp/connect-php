@@ -99,7 +99,7 @@ final readonly class ConformanceServiceImpl implements ConformanceServiceInterfa
         $name = ConformanceCode::name($error->getCode());
         \assert(\is_string($name));
 
-        return new ConnectException(Code::from(strtolower(substr($name, \strlen('CODE_')))), $error->getMessage(), $details);
+        return new ConnectException(Code::tryFrom(strtolower(substr($name, \strlen('CODE_')))) ?? Code::Unknown, $error->getMessage(), $details);
     }
 
     /**

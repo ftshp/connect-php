@@ -1,0 +1,5 @@
+# synchronous PSR-18 clients cannot cancel an in-flight call
+Client Cancellation/HTTPVersion:1/Protocol:PROTOCOL_CONNECT/Codec:CODEC_JSON/Compression:COMPRESSION_GZIP/TLS:false/unary/cancel-after-close-send
+Client Cancellation/HTTPVersion:1/Protocol:PROTOCOL_CONNECT/Codec:CODEC_JSON/Compression:COMPRESSION_IDENTITY/TLS:false/unary/cancel-after-close-send
+Client Cancellation/HTTPVersion:1/Protocol:PROTOCOL_CONNECT/Codec:CODEC_PROTO/Compression:COMPRESSION_GZIP/TLS:false/unary/cancel-after-close-send
+Client Cancellation/HTTPVersion:1/Protocol:PROTOCOL_CONNECT/Codec:CODEC_PROTO/Compression:COMPRESSION_IDENTITY/TLS:false/unary/cancel-after-close-send

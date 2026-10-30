@@ -5,6 +5,8 @@
     "type": "project",
     "require": {
         "php": "^8.5",
+        "ext-pcntl": "*",
+        "ext-posix": "*",
         "ftshp/connect": "@dev",
         "guzzlehttp/guzzle": "^7.9",
         "nyholm/psr7": "^1.8",

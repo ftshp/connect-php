@@ -4,26 +4,13 @@ declare(strict_types=1);
 
 use Connectrpc\Conformance\V1\ServerCompatRequest;
 use Connectrpc\Conformance\V1\ServerCompatResponse;
+use Ftshp\Connect\Conformance\Framing;
+
+ini_set('display_errors', 'stderr');
 
 require __DIR__ . '/vendor/autoload.php';
 
-function readExactly(int $length): string
-{
-    $data = '';
-    while (\strlen($data) < $length) {
-        $chunk = fread(STDIN, $length - \strlen($data));
-        if ($chunk === false || $chunk === '') {
-            throw new RuntimeException('stdin closed before the request was read');
-        }
-        $data .= $chunk;
-    }
-
-    return $data;
-}
-
-$length = unpack('N', readExactly(4));
-$request = new ServerCompatRequest();
-$request->mergeFromString(readExactly($length[1]));
+$request = Framing::read(new ServerCompatRequest()) ?? throw new RuntimeException('stdin closed before the request was read');
 
 // php -S workers outlive their master, so the whole group is stopped on SIGTERM.
 posix_setpgid(0, 0);
@@ -57,6 +44,9 @@ pcntl_signal(SIGTERM, static function () use ($child): never {
 
 $deadline = microtime(true) + 10;
 while (($socket = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.1)) === false) {
+    if (!proc_get_status($child)['running']) {
+        throw new RuntimeException('php -S exited before it started listening');
+    }
     if (microtime(true) > $deadline) {
         proc_terminate($child);
         throw new RuntimeException('php -S did not start listening');
@@ -65,9 +55,7 @@ while (($socket = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.1)) === fals
 }
 fclose($socket);
 
-$response = new ServerCompatResponse(['host' => '127.0.0.1', 'port' => $port])->serializeToString();
-fwrite(STDOUT, pack('N', \strlen($response)) . $response);
-fflush(STDOUT);
+Framing::write(new ServerCompatResponse(['host' => '127.0.0.1', 'port' => $port]));
 
 while (proc_get_status($child)['running']) {
     sleep(1);
