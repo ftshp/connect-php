@@ -35,6 +35,9 @@ final class ErrorBodyTest extends TestCase
     {
         return [
             'empty list' => ['[]'],
+            'empty object' => ['{}'],
+            'list' => ['[1]'],
+            'object without code or message' => ['{"error":"bad gateway"}'],
             'string' => ['"x"'],
             'not json' => ['not json'],
             'empty' => [''],
