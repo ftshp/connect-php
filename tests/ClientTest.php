@@ -323,6 +323,31 @@ final class ClientTest extends TestCase
     }
 
     #[Test]
+    public function longProxyBodyIsCutTo1024Bytes(): void
+    {
+        $e = $this->callError($this->client(self::respond(502, str_repeat('a', 2000))));
+
+        self::assertSame('HTTP 502: ' . str_repeat('a', 1024), $e->getMessage());
+    }
+
+    #[Test]
+    public function proxyBodyIsCutAtACharacterBoundary(): void
+    {
+        $e = $this->callError($this->client(self::respond(502, str_repeat('a', 1023) . "\u{e9}zz")));
+
+        self::assertSame('HTTP 502: ' . str_repeat('a', 1023), $e->getMessage());
+    }
+
+    #[Test]
+    public function proxyBodyThatIsNotUtf8IsLeftOut(): void
+    {
+        $e = $this->callError($this->client(self::respond(502, "\xff\xfe")));
+
+        self::assertSame(Code::Unavailable, $e->code());
+        self::assertSame('HTTP 502', $e->getMessage());
+    }
+
+    #[Test]
     public function jsonProxyBodyWithoutCodeOrMessageIsKept(): void
     {
         $e = $this->callError($this->client(self::respond(502, '{"error":"bad gateway"}', ['Content-Type' => 'application/json'])));
