@@ -6,6 +6,7 @@ namespace Ftshp\Connect\Tests;
 
 use Ftshp\Connect\Code;
 use Ftshp\Connect\ConnectException;
+use Ftshp\Connect\Headers;
 use Ftshp\Connect\Interceptor;
 use Ftshp\Connect\Server;
 use Ftshp\Connect\Test\EchoInterface;
@@ -435,6 +436,28 @@ final class ServerTest extends TestCase
             self::assertFalse($response->hasHeader('transfer-encoding'), $path);
             self::assertSame('1', $response->getHeaderLine('x-kept'), $path);
         }
+    }
+
+    #[Test]
+    public function headerTheResponseRejectsBecomesUnknown(): void
+    {
+        $copy = new class implements Interceptor {
+            #[\Override]
+            public function intercept(UnaryRequest $request, \Closure $next): Message
+            {
+                $response = $next($request);
+                $request->context->responseHeaders->replace(Headers::fromPsr(['x-bad' => ["a\x00b"], 'x-kept' => ['1']]));
+
+                return $response;
+            }
+        };
+
+        $response = $this->post(self::ECHO, 'application/proto', $this->proto('hello'), server: $this->server([$copy]));
+
+        self::assertSame(500, $response->getStatusCode());
+        self::assertSame('{"code":"unknown"}', (string) $response->getBody());
+        self::assertFalse($response->hasHeader('x-bad'));
+        self::assertSame('1', $response->getHeaderLine('x-kept'));
     }
 
     #[Test]

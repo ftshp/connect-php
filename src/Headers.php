@@ -104,8 +104,8 @@ final class Headers
         if (preg_match('/^[a-z0-9_.-]+$/', $name) !== 1 || str_starts_with($name, 'connect-')) {
             throw new \InvalidArgumentException(\sprintf('Invalid header name "%s"', $name));
         }
-        if (strpbrk($value, "\r\n") !== false) {
-            throw new \InvalidArgumentException(\sprintf('Header "%s" value contains a line break', $name));
+        if (!self::isBinary($name) && preg_match('/[\x00-\x08\x0a-\x1f\x7f]/', $value) === 1) {
+            throw new \InvalidArgumentException(\sprintf('Header "%s" value contains a control character', $name));
         }
 
         return $name;
