@@ -221,7 +221,7 @@ final class Server implements RequestHandlerInterface
     {
         $response = $this->responseFactory->createResponse($status ?? $e->code()->httpStatus());
         if ($context !== null) {
-            $response = $this->withMetadata($response, $context);
+            $response = $this->withMetadata($response, $context, skipRejected: true);
         }
 
         return $response
@@ -229,15 +229,20 @@ final class Server implements RequestHandlerInterface
             ->withBody($this->streamFactory->createStream(ErrorBody::encode($e)));
     }
 
-    private function withMetadata(ResponseInterface $response, Context $context): ResponseInterface
+    private function withMetadata(ResponseInterface $response, Context $context, bool $skipRejected = false): ResponseInterface
     {
-        foreach ($context->responseHeaders->toArray() as $name => $values) {
-            if (!\in_array((string) $name, self::BODY_HEADERS, true)) {
-                $response = $response->withHeader((string) $name, $values);
-            }
-        }
+        $headers = array_diff_key($context->responseHeaders->toArray(), array_flip(self::BODY_HEADERS));
         foreach ($context->responseTrailers->toArray() as $name => $values) {
-            $response = $response->withHeader('trailer-' . $name, $values);
+            $headers['trailer-' . $name] = $values;
+        }
+        foreach ($headers as $name => $values) {
+            try {
+                $response = $response->withHeader((string) $name, $values);
+            } catch (\InvalidArgumentException $e) {
+                if (!$skipRejected) {
+                    throw $e;
+                }
+            }
         }
 
         return $response;

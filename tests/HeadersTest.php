@@ -137,6 +137,38 @@ final class HeadersTest extends TestCase
     }
 
     #[Test]
+    public function rejectsControlCharactersInTextValues(): void
+    {
+        foreach (["a\x00b", "a\x1fb", "a\x7fb", "a\x08b"] as $value) {
+            try {
+                new Headers()->set('x-a', $value);
+                self::fail('Expected InvalidArgumentException for ' . bin2hex($value));
+            } catch (\InvalidArgumentException) {
+                self::addToAssertionCount(1);
+            }
+        }
+    }
+
+    #[Test]
+    public function allowsTabInTextValues(): void
+    {
+        $headers = new Headers();
+        $headers->set('x-a', "a\tb");
+
+        self::assertSame("a\tb", $headers->get('x-a'));
+    }
+
+    #[Test]
+    public function binaryValuesMayHoldAnyByte(): void
+    {
+        $headers = new Headers();
+        $headers->set('trace-bin', "\r\n\x00");
+
+        self::assertSame(['trace-bin' => ['DQoA']], $headers->toArray());
+        self::assertSame("\r\n\x00", Headers::fromPsr($headers->toArray())->get('trace-bin'));
+    }
+
+    #[Test]
     public function fromPsrDoesNotValidate(): void
     {
         $headers = Headers::fromPsr(['Sec-CH-UA' => ['"x"'], 'Connect-Protocol-Version' => ['1']]);
