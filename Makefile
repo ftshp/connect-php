@@ -25,4 +25,5 @@ cs:
 	vendor/bin/php-cs-fixer check --diff
 
 generate:
+	go build -o build/protoc-gen-connect-php ./cmd/protoc-gen-connect-php
 	buf generate

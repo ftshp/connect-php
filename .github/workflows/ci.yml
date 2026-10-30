@@ -40,3 +40,25 @@ jobs:
         with:
           dependency-versions: ${{ matrix.dependencies }}
       - run: vendor/bin/phpunit
+
+  generator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+      - name: Install protoc
+        run: |
+          curl -sSfL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v36.2/protoc-36.2-linux-x86_64.zip
+          sudo unzip -q -o protoc.zip -d /usr/local bin/protoc 'include/*'
+          rm protoc.zip
+      - run: go vet ./...
+      - run: test -z "$(gofmt -l .)"
+      - run: go test ./...
+      - run: make generate
+      - run: git diff --exit-code tests/Generated
+      - run: test -z "$(git status --porcelain tests/Generated)"
