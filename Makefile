@@ -2,6 +2,7 @@
 
 check:
 	composer validate --strict
+	composer normalize --dry-run
 	vendor/bin/composer-dependency-analyser
 	vendor/bin/php-cs-fixer check --diff
 	vendor/bin/phpstan
