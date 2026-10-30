@@ -1,0 +1,28 @@
+version: 2
+
+project_name: protoc-gen-connect-php
+
+builds:
+  - main: ./cmd/protoc-gen-connect-php
+    binary: protoc-gen-connect-php
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  - formats: [tar.gz]
+    name_template: "protoc-gen-connect-php_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  prerelease: auto
