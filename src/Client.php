@@ -220,7 +220,22 @@ final class Client
 
     private function statusError(int $status, string $body, Headers $metadata): ConnectException
     {
-        return new ConnectException(Code::fromHttpStatus($status), 'HTTP ' . $status . ($body !== '' ? ': ' . $body : ''))
+        $snippet = self::utf8Prefix($body, 1024);
+
+        return new ConnectException(Code::fromHttpStatus($status), 'HTTP ' . $status . ($snippet !== '' ? ': ' . $snippet : ''))
             ->withMetadata($metadata);
+    }
+
+    private static function utf8Prefix(string $text, int $maxBytes): string
+    {
+        if (preg_match('//u', $text) !== 1) {
+            return '';
+        }
+        $prefix = substr($text, 0, $maxBytes);
+        while (preg_match('//u', $prefix) !== 1) {
+            $prefix = substr($prefix, 0, -1);
+        }
+
+        return $prefix;
     }
 }
