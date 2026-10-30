@@ -1,6 +1,6 @@
 # Migrating from twirphp
 
-This guide moves a PHP application from twirphp's generated Twirp code to connect-php, one service at a time, without breaking callers in between. The examples use a `Stock` service in the `acme.stock` proto package, generated into the `Acme\Stock` namespace.
+To move a PHP application from twirphp to connect-php one service at a time without breaking callers, generate both sets of code, serve both routes during the switch, then move the callers. The examples use a `Stock` service in the `acme.stock` proto package, generated into the `Acme\Stock` namespace.
 
 ## Generating both
 
@@ -20,7 +20,7 @@ protoc --php_out=gen --twirp_php_out=gen --connect-php_out=gen acme/stock/stock.
 | `TwirpError`, one per package | `Ftshp\Connect\ConnectException` |
 | `Twirp\ServerHooks` | `Ftshp\Connect\Interceptor`, on the server and on the client |
 
-Method names change from `AvailabilityGet` to `availabilityGet`. PHP method names are case-insensitive, so existing call sites keep working until you rename them.
+Method names change from `AvailabilityGet` to `availabilityGet`. PHP method names are case-insensitive, so changing the case is optional. The argument order still changes, as the next section shows.
 
 ## Method signatures
 
@@ -159,7 +159,7 @@ final readonly class TwirpStockAdapter implements Stock
 }
 ```
 
-Every Connect code name is also a valid Twirp code, so the code passes through as a string. Other exceptions reach twirphp unchanged and it handles them as before. The Twirp route keeps its server hooks, so authentication on the old path does not change.
+The adapter passes an empty `Context`, so the implementation sees no request headers on the Twirp route and any response headers it sets are dropped there. Every Connect code name is also a valid Twirp code, so the code passes through as a string. Other exceptions reach twirphp unchanged and it handles them as before. The Twirp route keeps its server hooks, so authentication on the old path does not change.
 
 Mount both handlers. With Symfony, keep the existing Twirp controller on `/twirp/...` and add the Connect controller from [symfony.md](symfony.md):
 
