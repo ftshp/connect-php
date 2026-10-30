@@ -29,6 +29,8 @@ final class Client
     /** @var array<string, Compression> */
     private readonly array $acceptCompression;
 
+    private readonly string $prefix;
+
     /**
      * @param ?Compression $compression compresses request bodies
      * @param list<Compression> $acceptCompression accepted on responses
@@ -49,8 +51,10 @@ final class Client
         private readonly bool $useGet = false,
         private readonly ?int $timeoutMs = null,
         private readonly int $maxResponseBytes = 4194304,
-        private readonly string $prefix = '',
+        string $prefix = '',
     ) {
+        $prefix = trim($prefix, '/');
+        $this->prefix = $prefix === '' ? '' : '/' . $prefix;
         $byName = [];
         foreach ($acceptCompression as $algorithm) {
             $byName[strtolower($algorithm->name())] = $algorithm;
@@ -82,6 +86,12 @@ final class Client
     private function send(UnaryRequest $unary): Message
     {
         $context = $unary->context;
+        if ($context->timeoutMs !== null && $context->timeoutMs <= 0) {
+            throw new ConnectException(Code::DeadlineExceeded, 'timeout has already passed');
+        }
+        if ($context->timeoutMs > 9_999_999_999) {
+            throw new \InvalidArgumentException('timeoutMs has more than 10 digits');
+        }
         $context->begin($unary->method);
         $request = $this->buildRequest($unary);
         try {

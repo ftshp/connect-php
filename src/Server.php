@@ -34,6 +34,8 @@ final class Server implements RequestHandlerInterface
     /** @var array<string, Compression> */
     private readonly array $compression;
 
+    private readonly string $prefix;
+
     /**
      * @param list<Interceptor> $interceptors first is outermost
      * @param list<Compression> $compression accepted on requests and offered on responses
@@ -48,8 +50,10 @@ final class Server implements RequestHandlerInterface
         private readonly int $maxRequestBytes = 4194304,
         private readonly ?int $maxTimeoutMs = null,
         private readonly bool $requireProtocolHeader = false,
-        private readonly string $prefix = '',
+        string $prefix = '',
     ) {
+        $prefix = trim($prefix, '/');
+        $this->prefix = $prefix === '' ? '' : '/' . $prefix;
         $this->codecs = ['proto' => new ProtoCodec(), 'json' => new JsonCodec()];
         $byName = [];
         foreach ($compression as $algorithm) {

@@ -525,10 +525,12 @@ final class ServerTest extends TestCase
     #[Test]
     public function prefixIsStripped(): void
     {
-        $server = $this->server(prefix: '/rpc');
+        foreach (['rpc', '/rpc', '/rpc/'] as $prefix) {
+            $server = $this->server(prefix: $prefix);
 
-        self::assertSame(200, $this->post('/rpc' . self::ECHO, 'application/proto', $this->proto('a'), server: $server)->getStatusCode());
-        self::assertSame(404, $this->post(self::ECHO, 'application/proto', $this->proto('a'), server: $server)->getStatusCode());
+            self::assertSame(200, $this->post('/rpc' . self::ECHO, 'application/proto', $this->proto('a'), server: $server)->getStatusCode(), $prefix);
+            self::assertSame(404, $this->post(self::ECHO, 'application/proto', $this->proto('a'), server: $server)->getStatusCode(), $prefix);
+        }
     }
 
     #[Test]

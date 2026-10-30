@@ -146,6 +146,47 @@ final class ClientTest extends TestCase
     }
 
     #[Test]
+    public function nonPositiveTimeoutIsDeadlineExceededWithoutSending(): void
+    {
+        foreach ([[0, null], [-5, null], [null, 0]] as [$contextTimeout, $clientTimeout]) {
+            $client = $this->client(self::ok('HI'), timeoutMs: $clientTimeout);
+            try {
+                $this->call($client, 'hi', new Context(timeoutMs: $contextTimeout));
+                self::fail('expected a ConnectException');
+            } catch (ConnectException $e) {
+                self::assertSame(Code::DeadlineExceeded, $e->code());
+            }
+            self::assertNull($this->http->lastRequest);
+        }
+    }
+
+    #[Test]
+    public function timeoutOverTenDigitsIsRejected(): void
+    {
+        $client = $this->client(self::ok('HI'));
+        try {
+            $this->call($client, 'hi', new Context(timeoutMs: 10_000_000_000));
+            self::fail('expected an InvalidArgumentException');
+        } catch (\InvalidArgumentException) {
+            self::assertNull($this->http->lastRequest);
+        }
+        $this->call($client, 'hi', new Context(timeoutMs: 9_999_999_999));
+        self::assertSame('9999999999', $this->sentRequest()->getHeaderLine('Connect-Timeout-Ms'));
+    }
+
+    #[Test]
+    public function prefixIsNormalised(): void
+    {
+        foreach (['rpc', '/rpc', '/rpc/'] as $prefix) {
+            $this->call($this->client(self::ok('HI'), prefix: $prefix));
+
+            self::assertSame('https://api.test/rpc/ftshp.connect.test.Echo/Echo', (string) $this->sentRequest()->getUri(), $prefix);
+        }
+        $this->call($this->client(self::ok('HI')));
+        self::assertSame('https://api.test/ftshp.connect.test.Echo/Echo', (string) $this->sentRequest()->getUri());
+    }
+
+    #[Test]
     public function jsonCodec(): void
     {
         $client = $this->client(self::respond(200, '{"text":"HI"}', ['Content-Type' => 'application/json']), codec: new JsonCodec());
