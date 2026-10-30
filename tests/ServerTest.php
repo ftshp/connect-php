@@ -523,6 +523,26 @@ final class ServerTest extends TestCase
     }
 
     #[Test]
+    public function interceptorReturningTheWrongTypeIsInternal(): void
+    {
+        $wrong = new class implements Interceptor {
+            #[\Override]
+            public function intercept(UnaryRequest $request, \Closure $next): Message
+            {
+                return new EchoRequest();
+            }
+        };
+
+        $response = $this->post(self::ECHO, 'application/proto', $this->proto('a'), server: $this->server([$wrong]));
+
+        self::assertSame(500, $response->getStatusCode());
+        self::assertSame(
+            ['code' => 'internal', 'message' => 'interceptor returned Ftshp\Connect\Test\EchoRequest, expected Ftshp\Connect\Test\EchoResponse'],
+            $this->json($response),
+        );
+    }
+
+    #[Test]
     public function prefixIsStripped(): void
     {
         foreach (['rpc', '/rpc', '/rpc/'] as $prefix) {

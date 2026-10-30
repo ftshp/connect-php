@@ -515,6 +515,23 @@ final class ClientTest extends TestCase
     }
 
     #[Test]
+    public function interceptorReturningTheWrongTypeIsInternal(): void
+    {
+        $wrong = new class implements Interceptor {
+            #[\Override]
+            public function intercept(UnaryRequest $request, \Closure $next): Message
+            {
+                return new EchoRequest();
+            }
+        };
+
+        $e = $this->callError($this->client(self::ok('HI'), interceptors: [$wrong]));
+
+        self::assertSame(Code::Internal, $e->code());
+        self::assertSame('interceptor returned Ftshp\Connect\Test\EchoRequest, expected Ftshp\Connect\Test\EchoResponse', $e->getMessage());
+    }
+
+    #[Test]
     public function userHeaderWithConnectPrefixIsRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
