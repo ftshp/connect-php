@@ -28,7 +28,7 @@
         "ergebnis/composer-normalize": "^2.47",
         "friendsofphp/php-cs-fixer": "^3.90",
         "infection/infection": "^0.35",
-        "nyholm/psr7": "^1.8",
+        "nyholm/psr7": "^1.8.2",
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan": "^2.3",
         "phpstan/phpstan-deprecation-rules": "^2",
