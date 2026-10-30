@@ -1,5 +1,8 @@
 .PHONY: check fix test stan cs generate
 
+# Composer's vendor/ would otherwise switch the go command into vendor mode.
+export GOFLAGS := -mod=readonly
+
 check:
 	composer validate --strict
 	composer normalize --dry-run
@@ -7,7 +10,7 @@ check:
 	vendor/bin/php-cs-fixer check --diff
 	vendor/bin/phpstan
 	vendor/bin/phpunit
-	@if [ -f go.mod ]; then go test ./...; fi
+	go vet ./... && test -z "$$(gofmt -l .)" && go test ./...
 
 fix:
 	vendor/bin/php-cs-fixer fix
