@@ -174,4 +174,14 @@ final class HeadersTest extends TestCase
         self::assertSame('x', Headers::fromPsr([123 => ['x']])->get('123'));
         self::assertSame('x', new Headers(['123' => 'x'])->get('123'));
     }
+
+    #[Test]
+    public function replaceTakesEveryValueOfTheOther(): void
+    {
+        $headers = new Headers(['x-old' => '1']);
+
+        $headers->replace(Headers::fromPsr(['Connect-Thing' => ['a'], 'x-new' => ['b', 'c']]));
+
+        self::assertSame(['connect-thing' => ['a'], 'x-new' => ['b', 'c']], $headers->toArray());
+    }
 }

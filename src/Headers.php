@@ -67,6 +67,11 @@ final class Headers
         unset($this->values[strtolower($name)]);
     }
 
+    public function replace(self $other): void
+    {
+        $this->values = $other->values;
+    }
+
     public function has(string $name): bool
     {
         return isset($this->values[strtolower($name)]);

@@ -7,8 +7,8 @@ namespace Ftshp\Connect;
 use Google\Protobuf\Internal\Message;
 
 /**
- * @template TIn of Message
- * @template TOut of Message
+ * @template-covariant TIn of Message
+ * @template-covariant TOut of Message
  */
 final readonly class MethodDescriptor
 {
