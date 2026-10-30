@@ -99,14 +99,13 @@ final class Client
     {
         $context = $unary->context;
         $body = $this->codec->encode($unary->message());
-        $compression = $body === '' ? null : $this->compression;
-        if ($compression !== null) {
-            $body = $compression->compress($body);
+        if ($this->compression !== null) {
+            $body = $this->compression->compress($body);
         }
         $url = rtrim($this->baseUrl, '/') . $this->prefix . $unary->method->procedure();
         $get = $this->useGet && $unary->method->idempotency === Idempotency::NoSideEffects;
         $request = $get
-            ? $this->requestFactory->createRequest('GET', $url . '?' . GetQuery::encode($this->codec->name(), $body, $compression?->name()))
+            ? $this->requestFactory->createRequest('GET', $url . '?' . GetQuery::encode($this->codec->name(), $body, $this->compression?->name()))
             : $this->requestFactory->createRequest('POST', $url);
         foreach ($context->requestHeaders->toArray() as $name => $values) {
             $request = $request->withHeader((string) $name, $values);
@@ -127,7 +126,7 @@ final class Client
             ->withHeader('Content-Type', 'application/' . $this->codec->name())
             ->withBody($this->streamFactory->createStream($body));
 
-        return $compression === null ? $request : $request->withHeader('Content-Encoding', $compression->name());
+        return $this->compression === null ? $request : $request->withHeader('Content-Encoding', $this->compression->name());
     }
 
     private function readResponse(ResponseInterface $response, UnaryRequest $unary): Message
@@ -159,8 +158,11 @@ final class Client
                 ? $this->statusError($response->getStatusCode(), $body, $metadata)
                 : $this->error($response->getStatusCode(), $contentType, $this->decompress($body, $compression), $metadata);
         }
-        if (ContentType::mediaType($contentType) !== 'application/' . $this->codec->name()) {
-            throw new ConnectException(Code::Internal, \sprintf('unexpected content type "%s"', $contentType));
+        $mediaType = ContentType::mediaType($contentType);
+        if ($mediaType !== 'application/' . $this->codec->name()) {
+            $code = str_starts_with($mediaType, 'application/') ? Code::Internal : Code::Unknown;
+
+            throw new ConnectException($code, \sprintf('unexpected content type "%s"', $contentType));
         }
         if ($compression === false) {
             throw new ConnectException(Code::Internal, \sprintf('unknown compression "%s"', $encoding));
@@ -199,7 +201,7 @@ final class Client
 
     private function error(int $status, string $contentType, string $body, Headers $metadata): ConnectException
     {
-        $error = ContentType::mediaType($contentType) === 'application/json' ? ErrorBody::decode($body, $metadata) : null;
+        $error = ContentType::mediaType($contentType) === 'application/json' ? ErrorBody::decode($body, $metadata, Code::fromHttpStatus($status)) : null;
 
         return $error ?? $this->statusError($status, $body, $metadata);
     }
