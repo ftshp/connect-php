@@ -115,8 +115,7 @@ final class Server implements RequestHandlerInterface
             }
 
             $context = new Context(Headers::fromPsr($request->getHeaders()), $timeoutMs);
-            $context->method = $method;
-            $context->startTimer();
+            $context->begin($method);
 
             $body = $query !== null ? $query['message'] : $request->getBody();
             $unary = new UnaryRequest(

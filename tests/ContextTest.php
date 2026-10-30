@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Ftshp\Connect\Tests;
 
 use Ftshp\Connect\Context;
+use Ftshp\Connect\ServiceDescriptor;
+use Ftshp\Connect\Test\EchoInterface;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -17,11 +19,13 @@ final class ContextTest extends TestCase
     }
 
     #[Test]
-    public function startTimerSetsDeadline(): void
+    public function beginSetsMethodAndDeadline(): void
     {
+        $method = ServiceDescriptor::fromInterface(EchoInterface::class)->methods['Echo'];
         $context = new Context(timeoutMs: 50);
-        $context->startTimer();
+        $context->begin($method);
 
+        self::assertSame($method, $context->method);
         self::assertNotNull($context->deadline);
         $remaining = $context->remainingMs();
         self::assertNotNull($remaining);
@@ -30,10 +34,10 @@ final class ContextTest extends TestCase
     }
 
     #[Test]
-    public function startTimerWithoutTimeoutLeavesDeadlineUnset(): void
+    public function beginWithoutTimeoutLeavesDeadlineUnset(): void
     {
         $context = new Context();
-        $context->startTimer();
+        $context->begin(ServiceDescriptor::fromInterface(EchoInterface::class)->methods['Echo']);
 
         self::assertNull($context->deadline);
     }
@@ -41,8 +45,9 @@ final class ContextTest extends TestCase
     #[Test]
     public function remainingMsNeverNegative(): void
     {
-        $context = new Context();
-        $context->deadline = microtime(true) - 10;
+        $context = new Context(timeoutMs: 1);
+        $context->begin(ServiceDescriptor::fromInterface(EchoInterface::class)->methods['Echo']);
+        usleep(5000);
 
         self::assertSame(0, $context->remainingMs());
     }

@@ -450,11 +450,13 @@ final class ClientTest extends TestCase
         $interceptor = new class implements Interceptor {
             public ?string $seen = null;
             public ?bool $isClient = null;
+            public ?string $method = null;
 
             #[\Override]
             public function intercept(UnaryRequest $request, \Closure $next): Message
             {
                 $this->isClient = $request->isClient;
+                $this->method = $request->context->method->name;
                 $request->context->requestHeaders->set('x-added', 'yes');
                 $response = $next($request);
                 $this->seen = $request->context->responseHeaders->get('x-echoed');
@@ -468,6 +470,7 @@ final class ClientTest extends TestCase
         self::assertSame('yes', $this->sentRequest()->getHeaderLine('x-added'));
         self::assertSame('1', $interceptor->seen);
         self::assertTrue($interceptor->isClient);
+        self::assertSame('Echo', $interceptor->method);
     }
 
     #[Test]
