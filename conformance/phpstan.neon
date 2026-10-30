@@ -4,6 +4,10 @@ includes:
 parameters:
     paths:
         - src
+        - client.php
+        - server.php
+        - router.php
     scanDirectories:
         - gen
         - vendor/guzzlehttp
+        - vendor/nyholm

@@ -43,7 +43,11 @@ pcntl_signal(SIGTERM, static function () use ($child): never {
 });
 
 $deadline = microtime(true) + 10;
-while (($socket = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.1)) === false) {
+while (true) {
+    $socket = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.1);
+    if ($socket !== false) {
+        break;
+    }
     if (!proc_get_status($child)['running']) {
         throw new RuntimeException('php -S exited before it started listening');
     }

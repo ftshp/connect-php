@@ -21,9 +21,9 @@ final class Framing
         if ($prefix === '' || $prefix === false) {
             return null;
         }
-        $unpacked = unpack('N', $prefix);
-        $length = $unpacked === false ? null : $unpacked[1] ?? null;
-        if (\strlen($prefix) < 4 || !\is_int($length)) {
+        $unpacked = \strlen($prefix) < 4 ? false : unpack('N', $prefix);
+        $length = \is_array($unpacked) ? $unpacked[1] ?? null : null;
+        if (!\is_int($length)) {
             throw new \RuntimeException('stdin closed inside a size prefix');
         }
         $body = $length === 0 ? '' : stream_get_contents(STDIN, $length);

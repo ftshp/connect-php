@@ -38,7 +38,7 @@ final class ErrorBody
         } catch (\JsonException) {
             return null;
         }
-        if (!\is_array($data) || $data === []) {
+        if (!\is_array($data) || !(\array_key_exists('code', $data) || \array_key_exists('message', $data))) {
             return null;
         }
         $code = \is_string($data['code'] ?? null) ? Code::tryFrom($data['code']) ?? $fallback : $fallback;

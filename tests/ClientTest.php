@@ -282,6 +282,15 @@ final class ClientTest extends TestCase
     }
 
     #[Test]
+    public function jsonProxyBodyWithoutCodeOrMessageIsKept(): void
+    {
+        $e = $this->callError($this->client(self::respond(502, '{"error":"bad gateway"}', ['Content-Type' => 'application/json'])));
+
+        self::assertSame(Code::Unavailable, $e->code());
+        self::assertSame('HTTP 502: {"error":"bad gateway"}', $e->getMessage());
+    }
+
+    #[Test]
     public function empty503IsUnavailable(): void
     {
         $e = $this->callError($this->client(self::respond(503)));

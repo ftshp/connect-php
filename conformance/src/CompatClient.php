@@ -45,7 +45,7 @@ final class CompatClient
         $response = new ClientCompatResponse(['test_name' => $request->getTestName()]);
         try {
             $response->setResponse(self::invoke($request));
-        } catch (\InvalidArgumentException $e) {
+        } catch (\Throwable $e) {
             $response->setError(new ClientErrorResult(['message' => $e->getMessage()]));
         }
 
