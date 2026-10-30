@@ -17,7 +17,9 @@ use Ftshp\Connect\Server;
 use Ftshp\Connect\Test\EchoClient;
 use Ftshp\Connect\Test\EchoInterface;
 use Ftshp\Connect\Test\EchoRequest;
+use Ftshp\Connect\Test\EchoResponse;
 use Ftshp\Connect\Test\FailRequest;
+use Ftshp\Connect\Test\PBEmpty;
 use Ftshp\Connect\Tests\Fixture\EchoService;
 use Ftshp\Connect\Tests\Fixture\InProcessHttpClient;
 use Ftshp\Connect\UnaryRequest;
@@ -156,6 +158,58 @@ final class RoundTripTest extends TestCase
         self::assertInstanceOf(Value::class, $reason);
         self::assertSame('detail', $reason->getStringValue());
         self::assertSame('1', $e->metadata()->get('x-recorded'));
+    }
+
+    #[Test]
+    public function downstreamCallWithANewContextLeaksNothing(): void
+    {
+        $factory = new Psr17Factory();
+        $downstreamServer = new Server($factory, $factory);
+        $downstreamServer->register(EchoInterface::class, new EchoService());
+        $downstreamHttp = new InProcessHttpClient($downstreamServer);
+        $downstream = new EchoClient(new Client($downstreamHttp, $factory, $factory, 'http://downstream'));
+        $gateway = new class ($downstream) implements EchoInterface {
+            public function __construct(private readonly EchoClient $downstream) {}
+
+            #[\Override]
+            public function echo(EchoRequest $request, Context $context): EchoResponse
+            {
+                $forwarded = new Context(
+                    new Headers(['x-token' => $context->requestHeaders->get('x-token') ?? '']),
+                    timeoutMs: $context->remainingMs(),
+                );
+                $response = $this->downstream->echo($request, $forwarded);
+                $context->responseHeaders->set('x-downstream-timeout', $forwarded->responseHeaders->get('x-timeout') ?? '');
+
+                return $response;
+            }
+
+            #[\Override]
+            public function peek(EchoRequest $request, Context $context): EchoResponse
+            {
+                return new EchoResponse();
+            }
+
+            #[\Override]
+            public function fail(FailRequest $request, Context $context): PBEmpty
+            {
+                return new PBEmpty();
+            }
+        };
+        $server = new Server($factory, $factory);
+        $server->register(EchoInterface::class, $gateway);
+        $context = new Context(new Headers(['x-token' => 'secret', 'x-custom' => 'v']), timeoutMs: 5000);
+
+        $response = new EchoClient(new Client(new InProcessHttpClient($server), $factory, $factory, 'http://gateway'))
+            ->echo(new EchoRequest(['text' => 'hi']), $context);
+
+        self::assertSame(['x-token' => 'secret'], iterator_to_array($response->getHeaders()));
+        self::assertFalse($downstreamHttp->lastRequest?->hasHeader('x-custom'));
+        self::assertFalse($context->responseHeaders->has('x-echoed'));
+        self::assertFalse($context->responseTrailers->has('x-trailer'));
+        $timeout = (int) $context->responseHeaders->get('x-downstream-timeout');
+        self::assertGreaterThan(0, $timeout);
+        self::assertLessThanOrEqual(5000, $timeout);
     }
 
     #[Test]

@@ -24,6 +24,8 @@ use Psr\Http\Message\StreamInterface;
 
 final class Client
 {
+    private const array UNFORWARDED_HEADERS = ['host', 'content-length', 'transfer-encoding', 'connection', 'te', 'content-encoding'];
+
     /** @var array<string, Compression> */
     private readonly array $acceptCompression;
 
@@ -108,11 +110,11 @@ final class Client
             ? $this->requestFactory->createRequest('GET', $url . '?' . GetQuery::encode($this->codec->name(), $body, $this->compression?->name()))
             : $this->requestFactory->createRequest('POST', $url);
         foreach ($context->requestHeaders->toArray() as $name => $values) {
-            $request = $request->withHeader((string) $name, $values);
+            if (!\in_array((string) $name, self::UNFORWARDED_HEADERS, true)) {
+                $request = $request->withHeader((string) $name, $values);
+            }
         }
-        $request = $request
-            ->withoutHeader('Content-Encoding')
-            ->withHeader('Connect-Protocol-Version', '1');
+        $request = $request->withHeader('Connect-Protocol-Version', '1');
         if ($this->acceptCompression !== []) {
             $request = $request->withHeader('Accept-Encoding', implode(', ', array_keys($this->acceptCompression)));
         }
