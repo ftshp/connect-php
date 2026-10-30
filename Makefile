@@ -22,3 +22,4 @@ cs:
 	vendor/bin/php-cs-fixer check --diff
 
 generate:
+	buf generate
