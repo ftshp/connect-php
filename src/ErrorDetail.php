@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Ftshp\Connect;
 
 use Google\Protobuf\DescriptorPool;
+use Google\Protobuf\Internal\GPBDecodeException;
 use Google\Protobuf\Internal\Message;
 
 final readonly class ErrorDetail
@@ -35,7 +36,7 @@ final readonly class ErrorDetail
 
         try {
             $message->mergeFromString($this->value);
-        } catch (\Exception $e) {
+        } catch (GPBDecodeException $e) {
             throw new ConnectException(Code::Internal, 'invalid error detail', [], $e);
         }
 
@@ -46,7 +47,11 @@ final readonly class ErrorDetail
     {
         $descriptor = DescriptorPool::getGeneratedPool()->getDescriptorByClassName($message::class);
 
-        return $descriptor?->getFullName()
-            ?? throw new \InvalidArgumentException(\sprintf('No descriptor for %s', $message::class));
+        // @phpstan-ignore identical.alwaysFalse (the docblock says non-null, but the pool returns null for unknown classes)
+        if ($descriptor === null) {
+            throw new \InvalidArgumentException(\sprintf('No descriptor for %s', $message::class));
+        }
+
+        return $descriptor->getFullName();
     }
 }

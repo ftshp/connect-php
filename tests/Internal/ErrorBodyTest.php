@@ -52,6 +52,15 @@ final class ErrorBodyTest extends TestCase
     }
 
     #[Test]
+    public function encodeReplacesInvalidUtf8(): void
+    {
+        $json = ErrorBody::encode(new ConnectException(Code::Internal, "bad \xff"));
+
+        self::assertStringContainsString("\u{FFFD}", $json);
+        self::assertTrue(json_validate($json));
+    }
+
+    #[Test]
     public function decodeValid(): void
     {
         $e = ErrorBody::decode(
