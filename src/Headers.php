@@ -6,7 +6,7 @@ namespace Ftshp\Connect;
 
 final class Headers
 {
-    /** @var array<string, list<string>> */
+    /** @var array<array-key, list<string>> */
     private array $values = [];
 
     /**
@@ -22,13 +22,13 @@ final class Headers
     }
 
     /**
-     * @param array<string, list<string>> $headers
+     * @param array<array-key, list<string>> $headers
      */
     public static function fromPsr(array $headers): self
     {
         $result = new self();
         foreach ($headers as $name => $values) {
-            $name = strtolower($name);
+            $name = strtolower((string) $name);
             foreach ($values as $value) {
                 $result->values[$name][] = self::isBinary($name) ? self::decode($value) : $value;
             }
@@ -78,12 +78,13 @@ final class Headers
     }
 
     /**
-     * @return array<string, list<string>>
+     * @return array<array-key, list<string>>
      */
     public function toArray(): array
     {
         $result = [];
         foreach ($this->values as $name => $values) {
+            $name = (string) $name;
             $result[$name] = self::isBinary($name)
                 ? array_map(static fn(string $value): string => rtrim(base64_encode($value), '='), $values)
                 : $values;

@@ -155,4 +155,22 @@ final class HeadersTest extends TestCase
         self::assertFalse($headers->has('x-a'));
         self::assertTrue($headers->isEmpty());
     }
+
+    #[Test]
+    public function numericNamesWork(): void
+    {
+        $headers = new Headers();
+        $headers->set('123', 'x');
+        $headers->add('123', 'y');
+
+        self::assertSame('x', $headers->get('123'));
+        self::assertSame(['x', 'y'], $headers->all('123'));
+        self::assertTrue($headers->has('123'));
+        self::assertSame(['x', 'y'], $headers->toArray()[123]);
+
+        $headers->remove('123');
+        self::assertFalse($headers->has('123'));
+
+        self::assertSame('x', Headers::fromPsr([123 => ['x']])->get('123'));
+    }
 }
