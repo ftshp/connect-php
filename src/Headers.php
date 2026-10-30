@@ -10,13 +10,13 @@ final class Headers
     private array $values = [];
 
     /**
-     * @param array<string, string|list<string>> $headers
+     * @param array<array-key, string|list<string>> $headers
      */
     public function __construct(array $headers = [])
     {
         foreach ($headers as $name => $values) {
             foreach (\is_array($values) ? $values : [$values] as $value) {
-                $this->add($name, $value);
+                $this->add((string) $name, $value);
             }
         }
     }

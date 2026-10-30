@@ -172,5 +172,6 @@ final class HeadersTest extends TestCase
         self::assertFalse($headers->has('123'));
 
         self::assertSame('x', Headers::fromPsr([123 => ['x']])->get('123'));
+        self::assertSame('x', new Headers(['123' => 'x'])->get('123'));
     }
 }
