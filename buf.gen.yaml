@@ -2,3 +2,5 @@ version: v2
 plugins:
   - remote: buf.build/protocolbuffers/php:v36.2
     out: tests/Generated
+  - local: build/protoc-gen-connect-php
+    out: tests/Generated
