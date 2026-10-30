@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Ftshp\Connect;
 
 use Google\Protobuf\DescriptorPool;
-use Google\Protobuf\Internal\GPBDecodeException;
 use Google\Protobuf\Internal\Message;
 
 final readonly class ErrorDetail
@@ -36,7 +35,7 @@ final readonly class ErrorDetail
 
         try {
             $message->mergeFromString($this->value);
-        } catch (GPBDecodeException $e) {
+        } catch (\Exception $e) {
             throw new ConnectException(Code::Internal, 'invalid error detail', [], $e);
         }
 
