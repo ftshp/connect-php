@@ -17,6 +17,7 @@ use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamFactoryInterface;
+use Psr\Http\Message\StreamInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
 final class Server implements RequestHandlerInterface
@@ -33,6 +34,7 @@ final class Server implements RequestHandlerInterface
     /**
      * @param list<Interceptor> $interceptors first is outermost
      * @param list<Compression> $compression accepted on requests and offered on responses
+     * @param int $maxRequestBytes limit on raw and decompressed request bodies, 0 for none
      */
     public function __construct(
         private readonly ResponseFactoryInterface $responseFactory,
@@ -40,7 +42,7 @@ final class Server implements RequestHandlerInterface
         private readonly array $interceptors = [],
         array $compression = [new Gzip()],
         private readonly int $compressMinBytes = 1024,
-        private readonly int $maxRequestBytes = 0,
+        private readonly int $maxRequestBytes = 4194304,
         private readonly ?int $maxTimeoutMs = null,
         private readonly bool $requireProtocolHeader = false,
         private readonly string $prefix = '',
@@ -141,12 +143,29 @@ final class Server implements RequestHandlerInterface
 
     private function readBody(ServerRequestInterface $request, ?Compression $compression): string
     {
-        $body = (string) $request->getBody();
-        if ($this->maxRequestBytes > 0 && \strlen($body) > $this->maxRequestBytes) {
-            throw new ConnectException(Code::ResourceExhausted, 'message size exceeds limit');
-        }
+        $body = $this->maxRequestBytes > 0 ? $this->readBounded($request->getBody()) : (string) $request->getBody();
 
         return $compression === null || $body === '' ? $body : $compression->decompress($body, $this->maxRequestBytes);
+    }
+
+    private function readBounded(StreamInterface $stream): string
+    {
+        if ($stream->isSeekable()) {
+            $stream->rewind();
+        }
+        $body = '';
+        while (!$stream->eof()) {
+            $chunk = $stream->read(65536);
+            if ($chunk === '') {
+                break;
+            }
+            $body .= $chunk;
+            if (\strlen($body) > $this->maxRequestBytes) {
+                throw new ConnectException(Code::ResourceExhausted, 'message size exceeds limit');
+            }
+        }
+
+        return $body;
     }
 
     private function success(Message $message, Codec $codec, Context $context, ServerRequestInterface $request): ResponseInterface

@@ -31,7 +31,7 @@ final class ServerTest extends TestCase
     private function server(
         array $interceptors = [],
         int $compressMinBytes = 1024,
-        int $maxRequestBytes = 0,
+        int $maxRequestBytes = 4194304,
         ?int $maxTimeoutMs = null,
         bool $requireProtocolHeader = false,
         string $prefix = '',
@@ -284,6 +284,37 @@ final class ServerTest extends TestCase
         );
 
         self::assertSame(429, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function gzipBombIsRejectedByDefault(): void
+    {
+        $factory = new Psr17Factory();
+        $server = new Server($factory, $factory);
+        $server->register(EchoInterface::class, new EchoService());
+
+        $response = $this->post(
+            self::ECHO,
+            'application/proto',
+            (string) gzencode($this->proto(str_repeat('a', 5 * 1024 * 1024))),
+            ['Content-Encoding' => 'gzip'],
+            $server,
+        );
+
+        self::assertSame(429, $response->getStatusCode());
+        self::assertSame(['code' => 'resource_exhausted', 'message' => 'message size exceeds limit'], $this->json($response));
+    }
+
+    #[Test]
+    public function largeBodyIsRejectedByDefaultAndAcceptedWithoutLimit(): void
+    {
+        $body = $this->proto(str_repeat('a', 5 * 1024 * 1024));
+        $factory = new Psr17Factory();
+        $default = new Server($factory, $factory);
+        $default->register(EchoInterface::class, new EchoService());
+
+        self::assertSame(429, $this->post(self::ECHO, 'application/proto', $body, server: $default)->getStatusCode());
+        self::assertSame(200, $this->post(self::ECHO, 'application/proto', $body, server: $this->server(maxRequestBytes: 0))->getStatusCode());
     }
 
     #[Test]
