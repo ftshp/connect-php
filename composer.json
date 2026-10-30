@@ -27,6 +27,7 @@
     "require-dev": {
         "ergebnis/composer-normalize": "^2.47",
         "friendsofphp/php-cs-fixer": "^3.90",
+        "infection/infection": "^0.35",
         "nyholm/psr7": "^1.8",
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan": "^2.3",
@@ -51,6 +52,7 @@
     "config": {
         "allow-plugins": {
             "ergebnis/composer-normalize": true,
+            "infection/extension-installer": false,
             "phpstan/extension-installer": true
         },
         "sort-packages": true
