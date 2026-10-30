@@ -17,6 +17,7 @@
     ],
     "require": {
         "php": "^8.5",
+        "ext-zlib": "*",
         "google/protobuf": "^5.36",
         "psr/http-client": "^1.0",
         "psr/http-factory": "^1.1",
