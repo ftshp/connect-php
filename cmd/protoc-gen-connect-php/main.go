@@ -34,6 +34,9 @@ func run(in io.Reader, out, stderr io.Writer) error {
 	if err := proto.Unmarshal(raw, &req); err != nil {
 		return err
 	}
+	if req.GetParameter() != "" {
+		return fmt.Errorf("unknown option %q", req.GetParameter())
+	}
 	raw, err = proto.Marshal(generate(&req, stderr))
 	if err != nil {
 		return err

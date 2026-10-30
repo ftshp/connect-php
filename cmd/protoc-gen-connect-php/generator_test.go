@@ -107,3 +107,63 @@ func assertFiles(t *testing.T, expectedDir string, got []*pluginpb.CodeGenerator
 		t.Errorf("unexpected file %s", name)
 	}
 }
+
+func serviceRequest(methods ...string) *pluginpb.CodeGeneratorRequest {
+	svc := &descriptorpb.ServiceDescriptorProto{Name: proto.String("Svc")}
+	for _, name := range methods {
+		svc.Method = append(svc.Method, &descriptorpb.MethodDescriptorProto{
+			Name:       proto.String(name),
+			InputType:  proto.String(".acme.Msg"),
+			OutputType: proto.String(".acme.Msg"),
+		})
+	}
+	file := &descriptorpb.FileDescriptorProto{
+		Name:        proto.String("acme/svc.proto"),
+		Package:     proto.String("acme"),
+		Syntax:      proto.String("proto3"),
+		MessageType: []*descriptorpb.DescriptorProto{{Name: proto.String("Msg")}},
+		Service:     []*descriptorpb.ServiceDescriptorProto{svc},
+	}
+	return &pluginpb.CodeGeneratorRequest{FileToGenerate: []string{"acme/svc.proto"}, ProtoFile: []*descriptorpb.FileDescriptorProto{file}}
+}
+
+func TestGenerateRejectsCollidingRPCNames(t *testing.T) {
+	cases := map[string][]string{
+		"method suffix": {"Get", "GetMethod"},
+		"case":          {"Foo", "foo"},
+	}
+	for name, methods := range cases {
+		t.Run(name, func(t *testing.T) {
+			resp := generate(serviceRequest(methods...), &bytes.Buffer{})
+			for _, want := range []string{"acme.Svc", methods[0], methods[1]} {
+				if !strings.Contains(resp.GetError(), want) {
+					t.Errorf("error = %q, want it to mention %q", resp.GetError(), want)
+				}
+			}
+		})
+	}
+}
+
+func TestGenerateAcceptsDistinctRPCNames(t *testing.T) {
+	if resp := generate(serviceRequest("Get", "List"), &bytes.Buffer{}); resp.Error != nil {
+		t.Fatal(resp.GetError())
+	}
+}
+
+func TestRunRejectsUnknownOption(t *testing.T) {
+	raw, err := proto.Marshal(&pluginpb.CodeGeneratorRequest{Parameter: proto.String("foo=bar")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = run(bytes.NewReader(raw), &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || err.Error() != `unknown option "foo=bar"` {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestDescriptorProtoNamespace(t *testing.T) {
+	got := messageClass((&descriptorpb.FileDescriptorSet{}).ProtoReflect().Descriptor())
+	if want := `Google\Protobuf\Internal\FileDescriptorSet`; got != want {
+		t.Errorf("class = %q, want %q", got, want)
+	}
+}
