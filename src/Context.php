@@ -10,9 +10,9 @@ final class Context
 {
     public readonly Headers $responseHeaders;
     public readonly Headers $responseTrailers;
-    public ?float $deadline = null;
-    /** @var MethodDescriptor<Message, Message>|null */
-    public ?MethodDescriptor $method = null;
+    public private(set) ?float $deadline = null;
+    /** @var MethodDescriptor<Message, Message> */
+    public private(set) MethodDescriptor $method;
 
     public function __construct(
         public readonly Headers $requestHeaders = new Headers(),
@@ -31,10 +31,14 @@ final class Context
         return max(0, (int) ceil(($this->deadline - microtime(true)) * 1000));
     }
 
-    public function startTimer(): void
+    /**
+     * @internal sets the method and starts the timer when a call or an attempt starts
+     *
+     * @param MethodDescriptor<Message, Message> $method
+     */
+    public function begin(MethodDescriptor $method): void
     {
-        if ($this->timeoutMs !== null) {
-            $this->deadline = microtime(true) + $this->timeoutMs / 1000;
-        }
+        $this->method = $method;
+        $this->deadline = $this->timeoutMs === null ? null : microtime(true) + $this->timeoutMs / 1000;
     }
 }

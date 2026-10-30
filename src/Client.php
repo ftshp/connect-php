@@ -71,8 +71,8 @@ final class Client
      */
     public function unary(MethodDescriptor $method, Message $request, Context $context = new Context()): Message
     {
-        $context->method = $method;
         $context->timeoutMs ??= $this->timeoutMs;
+        $context->begin($method);
         $call = Chain::build($this->interceptors, $this->send(...));
 
         /** @var TOut */
@@ -81,9 +81,9 @@ final class Client
 
     private function send(UnaryRequest $unary): Message
     {
-        $request = $this->buildRequest($unary);
         $context = $unary->context;
-        $context->startTimer();
+        $context->begin($unary->method);
+        $request = $this->buildRequest($unary);
         try {
             $response = $this->http->sendRequest($request);
         } catch (NetworkExceptionInterface $e) {
