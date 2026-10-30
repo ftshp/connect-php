@@ -179,6 +179,13 @@ final class ServerTest extends TestCase
             $this->json($response),
         );
 
+        $response = $this->post(self::ECHO, 'application/proto', $this->proto('a'), ['Connect-Protocol-Version' => '2'], $server);
+        self::assertSame(400, $response->getStatusCode());
+        self::assertSame(
+            ['code' => 'invalid_argument', 'message' => 'unsupported Connect-Protocol-Version: must be 1'],
+            $this->json($response),
+        );
+
         $response = $this->post(self::ECHO, 'application/proto', $this->proto('a'), ['Connect-Protocol-Version' => '1'], $server);
         self::assertSame(200, $response->getStatusCode());
     }

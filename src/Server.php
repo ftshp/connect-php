@@ -147,6 +147,9 @@ final class Server implements RequestHandlerInterface
         if (!$isGet && !$request->hasHeader('Connect-Protocol-Version')) {
             throw new ConnectException(Code::InvalidArgument, 'missing required header: Connect-Protocol-Version');
         }
+        if (!$isGet && $request->getHeaderLine('Connect-Protocol-Version') !== '1') {
+            throw new ConnectException(Code::InvalidArgument, 'unsupported Connect-Protocol-Version: must be 1');
+        }
     }
 
     private function timeoutMs(ServerRequestInterface $request): ?int
