@@ -12,6 +12,7 @@ use Ftshp\Connect\Compression\Gzip;
 use Ftshp\Connect\Internal\Chain;
 use Ftshp\Connect\Internal\ContentType;
 use Ftshp\Connect\Internal\ErrorBody;
+use Ftshp\Connect\Internal\GetQuery;
 use Google\Protobuf\Internal\Message;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -79,23 +80,27 @@ final class Server implements RequestHandlerInterface
         }
         [$method, $handler] = $this->procedures[$procedure];
 
-        if ($request->getMethod() !== 'POST') {
+        $isGet = $request->getMethod() === 'GET' && $method->idempotency === Idempotency::NoSideEffects;
+        if (!$isGet && $request->getMethod() !== 'POST') {
             return $this->responseFactory->createResponse(405)
                 ->withHeader('Allow', $method->idempotency === Idempotency::NoSideEffects ? 'GET, POST' : 'POST');
         }
 
         $context = null;
         try {
-            if ($this->requireProtocolHeader && !$request->hasHeader('Connect-Protocol-Version')) {
-                throw new ConnectException(Code::InvalidArgument, 'missing required header: Connect-Protocol-Version');
+            if ($this->requireProtocolHeader) {
+                $this->checkProtocol($request, $isGet);
             }
-            $codec = ContentType::codec($request->getHeaderLine('Content-Type'), $this->codecs);
+            $query = $isGet ? GetQuery::parse($request->getQueryParams()) : null;
+            $codec = $query !== null
+                ? $this->codecs[$query['encoding']] ?? null
+                : ContentType::codec($request->getHeaderLine('Content-Type'), $this->codecs);
             if ($codec === null) {
                 return $this->responseFactory->createResponse(415)
                     ->withHeader('Accept-Post', 'application/json, application/proto');
             }
             $timeoutMs = $this->timeoutMs($request);
-            $encoding = strtolower(trim($request->getHeaderLine('Content-Encoding')));
+            $encoding = strtolower(trim($query !== null ? $query['compression'] ?? '' : $request->getHeaderLine('Content-Encoding')));
             $compression = null;
             if ($encoding !== '' && $encoding !== 'identity') {
                 $compression = $this->compression[$encoding] ?? null;
@@ -111,11 +116,12 @@ final class Server implements RequestHandlerInterface
             $context->method = $method;
             $context->startTimer();
 
+            $body = $query !== null ? $query['message'] : $request->getBody();
             $unary = new UnaryRequest(
                 $method,
                 $context,
                 false,
-                fn(): Message => $codec->decode($this->readBody($request, $compression), $method->input),
+                fn(): Message => $codec->decode($this->readBody($body, $compression), $method->input),
             );
             $call = Chain::build(
                 $this->interceptors,
@@ -125,6 +131,16 @@ final class Server implements RequestHandlerInterface
             return $this->success($call($unary), $codec, $context, $request);
         } catch (\Throwable $e) {
             return $this->error(ConnectException::fromThrowable($e), $context);
+        }
+    }
+
+    private function checkProtocol(ServerRequestInterface $request, bool $isGet): void
+    {
+        if ($isGet && ($request->getQueryParams()['connect'] ?? null) !== 'v1') {
+            throw new ConnectException(Code::InvalidArgument, 'missing required query parameter: connect=v1');
+        }
+        if (!$isGet && !$request->hasHeader('Connect-Protocol-Version')) {
+            throw new ConnectException(Code::InvalidArgument, 'missing required header: Connect-Protocol-Version');
         }
     }
 
@@ -141,9 +157,13 @@ final class Server implements RequestHandlerInterface
         return $this->maxTimeoutMs === null ? (int) $value : min((int) $value, $this->maxTimeoutMs);
     }
 
-    private function readBody(ServerRequestInterface $request, ?Compression $compression): string
+    private function readBody(StreamInterface|string $body, ?Compression $compression): string
     {
-        $body = $this->maxRequestBytes > 0 ? $this->readBounded($request->getBody()) : (string) $request->getBody();
+        if ($body instanceof StreamInterface) {
+            $body = $this->maxRequestBytes > 0 ? $this->readBounded($body) : (string) $body;
+        } elseif ($this->maxRequestBytes > 0 && \strlen($body) > $this->maxRequestBytes) {
+            throw new ConnectException(Code::ResourceExhausted, 'message size exceeds limit');
+        }
 
         return $compression === null || $body === '' ? $body : $compression->decompress($body, $this->maxRequestBytes);
     }
