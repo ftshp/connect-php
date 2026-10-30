@@ -22,7 +22,7 @@ final class Headers
     }
 
     /**
-     * @param array<array-key, list<string>> $headers
+     * @param array<array-key, array<string>> $headers as returned by PSR-7 getHeaders()
      */
     public static function fromPsr(array $headers): self
     {
