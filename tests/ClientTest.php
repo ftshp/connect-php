@@ -293,27 +293,46 @@ final class ClientTest extends TestCase
     #[Test]
     public function nullCodeFallsBackToStatus(): void
     {
-        $e = $this->callError($this->client(self::respond(400, '{"code":null}', ['Content-Type' => 'application/json'])));
+        $e = $this->callError($this->client(self::respond(400, '{"code":null,"message":"oops"}', ['Content-Type' => 'application/json'])));
 
         self::assertSame(Code::Internal, $e->code());
-        self::assertSame('HTTP 400: {"code":null}', $e->getMessage());
+        self::assertSame('oops', $e->getMessage());
     }
 
     #[Test]
     public function unknownCodeFallsBackToStatus(): void
     {
-        $e = $this->callError($this->client(self::respond(404, '{"code":"bad_route"}', ['Content-Type' => 'application/json; charset=utf-8'])));
+        $e = $this->callError($this->client(self::respond(404, '{"code":"bad_route","message":"oops"}', ['Content-Type' => 'application/json; charset=utf-8'])));
 
         self::assertSame(Code::Unimplemented, $e->code());
+        self::assertSame('oops', $e->getMessage());
     }
 
     #[Test]
-    public function wrongContentTypeOn200IsInternal(): void
+    public function missingCodeFallsBackToStatus(): void
+    {
+        $e = $this->callError($this->client(self::respond(429, '{"message":"oops"}', ['Content-Type' => 'application/json'])));
+
+        self::assertSame(Code::Unavailable, $e->code());
+        self::assertSame('oops', $e->getMessage());
+    }
+
+    #[Test]
+    public function nonConnectContentTypeOn200IsUnknown(): void
     {
         $e = $this->callError($this->client(self::respond(200, '<html></html>', ['Content-Type' => 'text/html'])));
 
-        self::assertSame(Code::Internal, $e->code());
+        self::assertSame(Code::Unknown, $e->code());
         self::assertSame('unexpected content type "text/html"', $e->getMessage());
+    }
+
+    #[Test]
+    public function otherCodecContentTypeOn200IsInternal(): void
+    {
+        $e = $this->callError($this->client(self::respond(200, '{}', ['Content-Type' => 'application/json'])));
+
+        self::assertSame(Code::Internal, $e->code());
+        self::assertSame('unexpected content type "application/json"', $e->getMessage());
     }
 
     #[Test]
@@ -376,13 +395,13 @@ final class ClientTest extends TestCase
     }
 
     #[Test]
-    public function emptyRequestIsNotCompressed(): void
+    public function emptyRequestIsCompressedWhenConfigured(): void
     {
         $this->call($this->client(self::ok('HI'), compression: new Gzip()), '');
 
         $request = $this->sentRequest();
-        self::assertFalse($request->hasHeader('Content-Encoding'));
-        self::assertSame('', (string) $request->getBody());
+        self::assertSame('gzip', $request->getHeaderLine('Content-Encoding'));
+        self::assertSame('', new Gzip()->decompress((string) $request->getBody(), 0));
     }
 
     #[Test]

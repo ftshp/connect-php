@@ -18,13 +18,22 @@ final class ErrorBodyTest extends TestCase
     /**
      * @return array<string, array{string}>
      */
+    public static function unusableCodes(): array
+    {
+        return [
+            'null code' => ['{"code":null,"message":"x"}'],
+            'unknown code' => ['{"code":"bad_route","message":"x"}'],
+            'numeric code' => ['{"code":5,"message":"x"}'],
+            'missing code' => ['{"message":"x"}'],
+        ];
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
     public static function invalidBodies(): array
     {
         return [
-            'null code' => ['{"code":null}'],
-            'unknown code' => ['{"code":"bad_route"}'],
-            'numeric code' => ['{"code":5}'],
-            'missing code' => ['{"message":"x"}'],
             'empty list' => ['[]'],
             'string' => ['"x"'],
             'not json' => ['not json'],
@@ -66,6 +75,7 @@ final class ErrorBodyTest extends TestCase
         $e = ErrorBody::decode(
             '{"code":"not_found","message":"gone","details":[{"type":"a.B","value":"AQI"}],"debug":{"x":1}}',
             new Headers(),
+            Code::Unknown,
         );
 
         self::assertNotNull($e);
@@ -79,7 +89,7 @@ final class ErrorBodyTest extends TestCase
     #[Test]
     public function decodeAcceptsPaddedBase64(): void
     {
-        $e = ErrorBody::decode('{"code":"internal","details":[{"type":"a.B","value":"AQI="}]}', new Headers());
+        $e = ErrorBody::decode('{"code":"internal","details":[{"type":"a.B","value":"AQI="}]}', new Headers(), Code::Unknown);
 
         self::assertNotNull($e);
         self::assertSame("\x01\x02", $e->details()[0]->value);
@@ -89,7 +99,18 @@ final class ErrorBodyTest extends TestCase
     #[DataProvider('invalidBodies')]
     public function decodeRejectsInvalidBody(string $json): void
     {
-        self::assertNull(ErrorBody::decode($json, new Headers()));
+        self::assertNull(ErrorBody::decode($json, new Headers(), Code::Unknown));
+    }
+
+    #[Test]
+    #[DataProvider('unusableCodes')]
+    public function decodeFallsBackToTheGivenCode(string $json): void
+    {
+        $e = ErrorBody::decode($json, new Headers(), Code::Unavailable);
+
+        self::assertNotNull($e);
+        self::assertSame(Code::Unavailable, $e->code());
+        self::assertSame('x', $e->getMessage());
     }
 
     #[Test]
@@ -98,6 +119,7 @@ final class ErrorBodyTest extends TestCase
         $e = ErrorBody::decode(
             '{"code":"internal","details":[1,{"type":"a.B"},{"type":"a.B","value":"!!"},{"type":"c.D","value":"AQI"}]}',
             new Headers(),
+            Code::Unknown,
         );
 
         self::assertNotNull($e);
@@ -108,7 +130,7 @@ final class ErrorBodyTest extends TestCase
     #[Test]
     public function decodeAttachesMetadata(): void
     {
-        $e = ErrorBody::decode('{"code":"aborted"}', new Headers(['x-a' => 'b']));
+        $e = ErrorBody::decode('{"code":"aborted"}', new Headers(['x-a' => 'b']), Code::Unknown);
 
         self::assertNotNull($e);
         self::assertSame('b', $e->metadata()->get('x-a'));

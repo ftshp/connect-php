@@ -31,21 +31,17 @@ final class ErrorBody
         return json_encode($body, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
-    public static function decode(string $json, Headers $metadata): ?ConnectException
+    public static function decode(string $json, Headers $metadata, Code $fallback): ?ConnectException
     {
         try {
             $data = json_decode($json, true, 16, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
             return null;
         }
-        if (!\is_array($data) || !\is_string($data['code'] ?? null)) {
+        if (!\is_array($data) || $data === []) {
             return null;
         }
-        $code = Code::tryFrom($data['code']);
-        if ($code === null) {
-            return null;
-        }
-
+        $code = \is_string($data['code'] ?? null) ? Code::tryFrom($data['code']) ?? $fallback : $fallback;
         $message = \is_string($data['message'] ?? null) ? $data['message'] : '';
 
         return (new ConnectException($code, $message, self::details($data['details'] ?? null)))
