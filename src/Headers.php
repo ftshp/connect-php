@@ -1,0 +1,121 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Ftshp\Connect;
+
+final class Headers
+{
+    /** @var array<string, list<string>> */
+    private array $values = [];
+
+    /**
+     * @param array<string, string|list<string>> $headers
+     */
+    public function __construct(array $headers = [])
+    {
+        foreach ($headers as $name => $values) {
+            foreach (\is_array($values) ? $values : [$values] as $value) {
+                $this->add($name, $value);
+            }
+        }
+    }
+
+    /**
+     * @param array<string, list<string>> $headers
+     */
+    public static function fromPsr(array $headers): self
+    {
+        $result = new self();
+        foreach ($headers as $name => $values) {
+            $name = strtolower($name);
+            foreach ($values as $value) {
+                $result->values[$name][] = self::isBinary($name) ? self::decode($value) : $value;
+            }
+        }
+
+        return $result;
+    }
+
+    public function get(string $name): ?string
+    {
+        return $this->values[strtolower($name)][0] ?? null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function all(string $name): array
+    {
+        return $this->values[strtolower($name)] ?? [];
+    }
+
+    public function set(string $name, string $value): void
+    {
+        $name = self::validate($name, $value);
+        $this->values[$name] = [$value];
+    }
+
+    public function add(string $name, string $value): void
+    {
+        $name = self::validate($name, $value);
+        $this->values[$name][] = $value;
+    }
+
+    public function remove(string $name): void
+    {
+        unset($this->values[strtolower($name)]);
+    }
+
+    public function has(string $name): bool
+    {
+        return isset($this->values[strtolower($name)]);
+    }
+
+    public function isEmpty(): bool
+    {
+        return $this->values === [];
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    public function toArray(): array
+    {
+        $result = [];
+        foreach ($this->values as $name => $values) {
+            $result[$name] = self::isBinary($name)
+                ? array_map(static fn(string $value): string => rtrim(base64_encode($value), '='), $values)
+                : $values;
+        }
+
+        return $result;
+    }
+
+    private static function validate(string $name, string $value): string
+    {
+        $name = strtolower($name);
+        if (preg_match('/^[a-z0-9_.-]+$/', $name) !== 1 || str_starts_with($name, 'connect-')) {
+            throw new \InvalidArgumentException(\sprintf('Invalid header name "%s"', $name));
+        }
+        if (strpbrk($value, "\r\n") !== false) {
+            throw new \InvalidArgumentException(\sprintf('Header "%s" value contains a line break', $name));
+        }
+
+        return $name;
+    }
+
+    private static function isBinary(string $name): bool
+    {
+        return str_ends_with($name, '-bin');
+    }
+
+    private static function decode(string $value): string
+    {
+        $padded = str_pad($value, (int) ceil(\strlen($value) / 4) * 4, '=');
+
+        $decoded = base64_decode($padded, true);
+
+        return $decoded === false ? $value : $decoded;
+    }
+}
