@@ -6,8 +6,8 @@ use PhpCsFixer\Config;
 use PhpCsFixer\Finder;
 
 $finder = new Finder()
-    ->in([__DIR__ . '/src', __DIR__ . '/tests'])
-    ->exclude('Generated/GPBMetadata')
+    ->in([__DIR__ . '/src', __DIR__ . '/tests', __DIR__ . '/conformance'])
+    ->exclude(['Generated/GPBMetadata', 'gen', 'vendor'])
     ->notPath([
         'Generated/Ftshp/Connect/Test/EchoRequest.php',
         'Generated/Ftshp/Connect/Test/EchoResponse.php',
