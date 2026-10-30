@@ -1,0 +1,32 @@
+{
+    "name": "ftshp/connect-conformance",
+    "description": "Conformance test programs for ftshp/connect",
+    "license": "Apache-2.0",
+    "type": "project",
+    "require": {
+        "php": "^8.5",
+        "ftshp/connect": "@dev",
+        "guzzlehttp/guzzle": "^7.9",
+        "nyholm/psr7": "^1.8",
+        "nyholm/psr7-server": "^1.1"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "..",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Connectrpc\\Conformance\\V1\\": "gen/Connectrpc/Conformance/V1/",
+            "Ftshp\\Connect\\Conformance\\": "src/",
+            "GPBMetadata\\": "gen/GPBMetadata/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

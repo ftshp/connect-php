@@ -1,0 +1,8 @@
+version: v2
+inputs:
+  - module: buf.build/connectrpc/conformance:v1.0.7
+plugins:
+  - remote: buf.build/protocolbuffers/php:v36.2
+    out: gen
+  - local: ../build/protoc-gen-connect-php
+    out: gen
