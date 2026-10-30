@@ -1,0 +1,25 @@
+name: Mirror
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    env:
+      MIRROR_URL: ${{ secrets.GITLAB_MIRROR_URL }}
+    steps:
+      - if: env.MIRROR_URL != ''
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - if: env.MIRROR_URL != ''
+        run: git push --force "$MIRROR_URL" refs/remotes/origin/main:refs/heads/main 'refs/tags/*:refs/tags/*'

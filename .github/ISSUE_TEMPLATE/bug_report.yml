@@ -1,0 +1,43 @@
+name: Bug report
+description: Something in the library or the code generator does not work as documented.
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what you expected to happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: The smallest proto file, PHP code or request that shows the problem, and the error or output you get.
+      render: php
+    validations:
+      required: true
+  - type: input
+    id: php-version
+    attributes:
+      label: PHP version
+      placeholder: "8.5.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: protobuf-runtime
+    attributes:
+      label: Protobuf runtime
+      options:
+        - protobuf C extension
+        - pure PHP (google/protobuf)
+    validations:
+      required: true
+  - type: input
+    id: library-version
+    attributes:
+      label: Library version
+      description: The ftshp/connect version, and the protoc-gen-connect-php version if the problem is in generated code.
+      placeholder: "v0.1.0"
+    validations:
+      required: true
