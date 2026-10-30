@@ -7,7 +7,13 @@ use PhpCsFixer\Finder;
 
 $finder = new Finder()
     ->in([__DIR__ . '/src', __DIR__ . '/tests'])
-    ->exclude('Generated');
+    ->exclude('Generated/GPBMetadata')
+    ->notPath([
+        'Generated/Ftshp/Connect/Test/EchoRequest.php',
+        'Generated/Ftshp/Connect/Test/EchoResponse.php',
+        'Generated/Ftshp/Connect/Test/FailRequest.php',
+        'Generated/Ftshp/Connect/Test/PBEmpty.php',
+    ]);
 
 return new Config()
     ->setRiskyAllowed(true)
