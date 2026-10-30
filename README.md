@@ -255,7 +255,7 @@ The client never sends `host`, `content-length`, `transfer-encoding`, `connectio
 
 ## Errors
 
-Every failure is a `ConnectException` with a `Code`. A server handler throws one to send that code and message to the client:
+Every failed RPC ends in a `ConnectException` with a `Code`. Invalid metadata you set yourself throws `\InvalidArgumentException` instead: a header name outside the allowed characters or with the `connect-` prefix, a text value with a control character, or a `timeoutMs` longer than 10 digits. A server handler throws a `ConnectException` to send its code and message to the client:
 
 ```php
 throw new ConnectException(Code::NotFound, 'no such user', [new ErrorInfo(['reason' => 'USER_DELETED'])]);
