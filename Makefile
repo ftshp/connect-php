@@ -1,4 +1,4 @@
-.PHONY: check fix test stan cs generate conformance conformance-install conformance-server conformance-client
+.PHONY: check fix test stan cs generate conformance conformance-install conformance-server conformance-client mutation
 
 # Composer's vendor/ would otherwise switch the go command into vendor mode.
 export GOFLAGS := -mod=readonly
@@ -44,3 +44,6 @@ conformance-client:
 	build/bin/connectconformance --conf conformance/config.yaml --mode client --known-failing @conformance/known-failing-client.txt -- php conformance/client.php
 
 conformance: conformance-server conformance-client
+
+mutation:
+	vendor/bin/infection --threads=max --min-msi=70 --min-covered-msi=80
