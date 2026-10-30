@@ -44,6 +44,19 @@ final class GzipTest extends TestCase
     }
 
     #[Test]
+    public function oneByteOverTheLimitIsResourceExhausted(): void
+    {
+        $gzip = new Gzip();
+
+        try {
+            $gzip->decompress($gzip->compress(str_repeat('a', 1025)), 1024);
+            self::fail('Expected ConnectException');
+        } catch (ConnectException $e) {
+            self::assertSame(Code::ResourceExhausted, $e->code());
+        }
+    }
+
+    #[Test]
     public function unlimitedWhenZero(): void
     {
         $gzip = new Gzip();

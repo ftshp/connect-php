@@ -6,7 +6,6 @@ namespace Ftshp\Connect\Codec;
 
 use Ftshp\Connect\Code;
 use Ftshp\Connect\ConnectException;
-use Google\Protobuf\Internal\GPBDecodeException;
 use Google\Protobuf\Internal\Message;
 
 final class ProtoCodec implements Codec
@@ -26,7 +25,7 @@ final class ProtoCodec implements Codec
         $message = new $class();
         try {
             $message->mergeFromString($data);
-        } catch (GPBDecodeException $e) {
+        } catch (\Exception $e) {
             throw new ConnectException(Code::InvalidArgument, 'invalid proto message: ' . $e->getMessage(), previous: $e);
         }
 
