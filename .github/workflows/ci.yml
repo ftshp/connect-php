@@ -51,6 +51,7 @@ jobs:
       - uses: bufbuild/buf-action@v1
         with:
           setup_only: true
+          version: 1.75.0
       - name: Install protoc
         run: |
           curl -sSfL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v36.2/protoc-36.2-linux-x86_64.zip

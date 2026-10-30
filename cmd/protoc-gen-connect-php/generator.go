@@ -91,7 +91,15 @@ func generateService(fd protoreflect.FileDescriptor, sd protoreflect.ServiceDesc
 	refs, imports := resolveClasses(data.Namespace, messages, taken)
 
 	idempotent := false
+	owners := map[string]string{}
 	for _, md := range unary {
+		for _, name := range []string{lcfirst(string(md.Name())), lcfirst(string(md.Name())) + "Method"} {
+			key := strings.ToLower(name)
+			if other, ok := owners[key]; ok && other != string(md.Name()) {
+				return nil, fmt.Errorf("%s: RPCs %s and %s map to the same PHP method name %s", sd.FullName(), other, md.Name(), name)
+			}
+			owners[key] = string(md.Name())
+		}
 		opts := md.Options().(*descriptorpb.MethodOptions)
 		m := method{
 			Name:        string(md.Name()),
@@ -177,6 +185,9 @@ func resolveClasses(namespace string, messages []protoreflect.MessageDescriptor,
 }
 
 func fileNamespace(fd protoreflect.FileDescriptor) string {
+	if fd.Path() == "google/protobuf/descriptor.proto" {
+		return `Google\Protobuf\Internal`
+	}
 	var override *string
 	if opts := fd.Options().(*descriptorpb.FileOptions); opts != nil {
 		override = opts.PhpNamespace
