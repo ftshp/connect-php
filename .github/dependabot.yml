@@ -5,6 +5,11 @@ updates:
     schedule:
       interval: weekly
     labels: [dependencies]
+  - package-ecosystem: composer
+    directory: /conformance
+    schedule:
+      interval: weekly
+    labels: [dependencies]
   - package-ecosystem: gomod
     directory: /
     schedule:
