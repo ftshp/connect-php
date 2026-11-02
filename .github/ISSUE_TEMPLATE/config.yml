@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/ftshp/connect-php/security/advisories/new
+    about: Report a vulnerability privately instead of opening an issue.
+  - name: Connect protocol questions
+    url: https://connectrpc.com/docs/
+    about: Questions about the protocol itself are answered by the Connect documentation.
