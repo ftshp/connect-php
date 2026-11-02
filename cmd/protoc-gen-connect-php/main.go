@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/debug"
+	"strings"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/pluginpb"
@@ -16,13 +18,23 @@ func main() {
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 	if *showVersion {
-		fmt.Println("protoc-gen-connect-php", version)
+		fmt.Println("protoc-gen-connect-php", buildVersion())
 		return
 	}
 	if err := run(os.Stdin, os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, "protoc-gen-connect-php:", err)
 		os.Exit(1)
 	}
+}
+
+func buildVersion() string {
+	if version != "devel" {
+		return version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return strings.TrimPrefix(info.Main.Version, "v")
+	}
+	return version
 }
 
 func run(in io.Reader, out, stderr io.Writer) error {
