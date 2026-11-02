@@ -22,7 +22,7 @@ jobs:
           php-version: '8.5'
           extensions: bcmath
           coverage: none
-      - uses: ramsey/composer-install@v3
+      - uses: ramsey/composer-install@v4
       - run: composer validate --strict
       - run: composer normalize --dry-run
       - run: vendor/bin/composer-dependency-analyser
@@ -43,7 +43,7 @@ jobs:
           php-version: '8.5'
           extensions: ${{ matrix.protobuf == 'ext' && 'bcmath, protobuf' || 'bcmath' }}
           coverage: none
-      - uses: ramsey/composer-install@v3
+      - uses: ramsey/composer-install@v4
         with:
           dependency-versions: ${{ matrix.dependencies }}
       - run: vendor/bin/phpunit
@@ -95,7 +95,7 @@ jobs:
             ~/go/pkg/mod
             build/bin
           key: conformance-${{ runner.os }}-v1.0.7
-      - uses: ramsey/composer-install@v3
+      - uses: ramsey/composer-install@v4
       - run: make conformance-install
       - run: make conformance-server
       - run: make conformance-client
@@ -112,5 +112,5 @@ jobs:
           php-version: '8.5'
           extensions: bcmath
           coverage: pcov
-      - uses: ramsey/composer-install@v3
+      - uses: ramsey/composer-install@v4
       - run: vendor/bin/infection --threads=max --git-diff-lines --git-diff-base=origin/main --min-msi=70 --min-covered-msi=80 --logger-github
