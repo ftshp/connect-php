@@ -1,4 +1,4 @@
-# Connect for PHP
+# ftshp/connect
 
 A PHP implementation of the Connect protocol for unary RPC, with a PSR-18 client and a PSR-15 server.
 
@@ -383,4 +383,4 @@ make conformance
 
 Copyright 2026 Footshop a.s. Licensed under the Apache License 2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-Connect is a project of the Connect authors; this project uses the name only to describe the protocol it implements.
+Connect is a Cloud Native Computing Foundation sandbox project created by Buf. Its name is used here only to describe the protocol this library implements. This project is not endorsed by or affiliated with the Connect project, Buf or the CNCF.

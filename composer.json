@@ -1,7 +1,12 @@
 {
     "name": "ftshp/connect",
-    "description": "Connect RPC for PHP: a community implementation of the Connect protocol with a PSR-18 client and a PSR-15 server",
+    "description": "A PHP implementation of the Connect protocol: PSR-18 client, PSR-15 server and a protoc plugin",
     "license": "Apache-2.0",
+    "homepage": "https://github.com/ftshp/connect-php",
+    "support": {
+        "issues": "https://github.com/ftshp/connect-php/issues",
+        "source": "https://github.com/ftshp/connect-php"
+    },
     "type": "library",
     "keywords": [
         "connect",
