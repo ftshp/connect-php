@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - uses: bufbuild/buf-action@v1
@@ -82,7 +82,7 @@ jobs:
           php-version: '8.5'
           extensions: protobuf, pcntl, posix, bcmath, zlib
           coverage: none
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - uses: bufbuild/buf-action@v1
