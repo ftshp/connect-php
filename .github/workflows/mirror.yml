@@ -18,7 +18,7 @@ jobs:
       MIRROR_URL: ${{ secrets.GITLAB_MIRROR_URL }}
     steps:
       - if: env.MIRROR_URL != ''
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - if: env.MIRROR_URL != ''
