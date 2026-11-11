@@ -138,5 +138,6 @@ final class ErrorBodyTest extends TestCase
         self::assertNotNull($e);
         self::assertSame('b', $e->metadata()->get('x-a'));
         self::assertSame('', $e->getMessage());
+        self::assertTrue($e->isWireError());
     }
 }

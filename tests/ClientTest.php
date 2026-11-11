@@ -24,6 +24,7 @@ use Ftshp\Connect\Test\EchoResponse;
 use Ftshp\Connect\Tests\Fixture\FakeClientException;
 use Ftshp\Connect\Tests\Fixture\FakeHttpClient;
 use Ftshp\Connect\Tests\Fixture\FakeNetworkException;
+use Ftshp\Connect\Tests\Fixture\RetryOnce;
 use Ftshp\Connect\UnaryRequest;
 use Google\Protobuf\Internal\Message;
 use Google\Protobuf\Struct;
@@ -128,12 +129,14 @@ final class ClientTest extends TestCase
         self::assertSame('POST', $request->getMethod());
         self::assertSame('https://api.test/rpc/ftshp.connect.test.Echo/Echo', (string) $request->getUri());
         $headers = array_change_key_case($request->getHeaders());
-        unset($headers['host']);
+        $timeout = (int) $request->getHeaderLine('Connect-Timeout-Ms');
+        unset($headers['host'], $headers['connect-timeout-ms']);
         ksort($headers);
+        self::assertGreaterThan(0, $timeout);
+        self::assertLessThanOrEqual(500, $timeout);
         self::assertSame([
             'accept-encoding' => ['gzip'],
             'connect-protocol-version' => ['1'],
-            'connect-timeout-ms' => ['500'],
             'content-type' => ['application/proto'],
             'x-token' => ['secret'],
         ], $headers);
@@ -161,17 +164,88 @@ final class ClientTest extends TestCase
     }
 
     #[Test]
-    public function timeoutOverTenDigitsIsRejected(): void
+    public function timeoutOverTenDigitsIsNotSent(): void
     {
         $client = $this->client(self::ok('HI'));
-        try {
-            $this->call($client, 'hi', new Context(timeoutMs: 10_000_000_000));
-            self::fail('expected an InvalidArgumentException');
-        } catch (\InvalidArgumentException) {
-            self::assertNull($this->http->lastRequest);
-        }
-        $this->call($client, 'hi', new Context(timeoutMs: 9_999_999_999));
-        self::assertSame('9999999999', $this->sentRequest()->getHeaderLine('Connect-Timeout-Ms'));
+
+        $this->call($client, 'hi', new Context(timeoutMs: 20_000_000_000));
+
+        self::assertFalse($this->sentRequest()->hasHeader('Connect-Timeout-Ms'));
+    }
+
+    #[Test]
+    public function attemptsShareTheCallDeadlineAndSendTheTimeLeft(): void
+    {
+        $sent = [];
+        $client = $this->client(
+            static function (RequestInterface $request) use (&$sent): ResponseInterface {
+                $sent[] = (int) $request->getHeaderLine('Connect-Timeout-Ms');
+                usleep(30000);
+
+                return new Response(503);
+            },
+            interceptors: [new RetryOnce()],
+            timeoutMs: 1000,
+        );
+
+        $this->callError($client);
+
+        self::assertCount(2, $sent);
+        self::assertLessThanOrEqual(1000, $sent[0]);
+        self::assertLessThanOrEqual($sent[0] - 30, $sent[1]);
+        self::assertGreaterThan(0, $sent[1]);
+    }
+
+    #[Test]
+    public function attemptAfterTheDeadlineIsDeadlineExceededWithoutSending(): void
+    {
+        $sent = 0;
+        $client = $this->client(
+            static function (RequestInterface $request) use (&$sent): ResponseInterface {
+                ++$sent;
+                usleep(30000);
+
+                return new Response(503);
+            },
+            interceptors: [new RetryOnce()],
+            timeoutMs: 20,
+        );
+
+        $e = $this->callError($client);
+
+        self::assertSame(Code::DeadlineExceeded, $e->code());
+        self::assertSame(1, $sent);
+    }
+
+    #[Test]
+    public function timeoutSetByAnInterceptorStartsTheDeadline(): void
+    {
+        $sent = [];
+        $setTimeout = new class implements Interceptor {
+            #[\Override]
+            public function intercept(UnaryRequest $request, \Closure $next): Message
+            {
+                $request->context->timeoutMs = 300;
+
+                return $next($request);
+            }
+        };
+        $client = $this->client(
+            static function (RequestInterface $request) use (&$sent): ResponseInterface {
+                $sent[] = (int) $request->getHeaderLine('Connect-Timeout-Ms');
+                usleep(30000);
+
+                return new Response(503);
+            },
+            interceptors: [new RetryOnce(), $setTimeout],
+        );
+
+        $this->callError($client);
+
+        self::assertCount(2, $sent);
+        self::assertGreaterThan(250, $sent[0]);
+        self::assertLessThanOrEqual(300, $sent[0]);
+        self::assertLessThanOrEqual($sent[0] - 30, $sent[1]);
     }
 
     #[Test]
@@ -287,6 +361,7 @@ final class ClientTest extends TestCase
         self::assertSame('no such thing', $e->getMessage());
         self::assertCount(1, $e->details());
         self::assertSame('1', $e->metadata()->get('x-err'));
+        self::assertTrue($e->isWireError());
     }
 
     #[Test]
@@ -309,42 +384,58 @@ final class ClientTest extends TestCase
         $e = $this->callError($client);
 
         self::assertSame(Code::Unimplemented, $e->code());
-        self::assertSame('HTTP 404: xx', $e->getMessage());
+        self::assertSame('HTTP 404 Not Found', $e->getMessage());
     }
 
     #[Test]
-    public function html502IsUnavailableWithBody(): void
+    public function html502IsUnavailableWithStatusLineOnly(): void
     {
         $e = $this->callError($this->client(self::respond(502, '<html>Bad Gateway</html>', ['Content-Type' => 'text/html', 'Trailer-X-T' => 't'])));
 
         self::assertSame(Code::Unavailable, $e->code());
-        self::assertSame('HTTP 502: <html>Bad Gateway</html>', $e->getMessage());
+        self::assertSame('HTTP 502 Bad Gateway', $e->getMessage());
         self::assertSame('t', $e->metadata()->get('x-t'));
+    }
+
+    #[Test]
+    public function plainTextProxyBodyIsKept(): void
+    {
+        $e = $this->callError($this->client(self::respond(502, 'upstream reset', ['Content-Type' => 'text/plain; charset=utf-8'])));
+
+        self::assertSame('HTTP 502 Bad Gateway: upstream reset', $e->getMessage());
+    }
+
+    #[Test]
+    public function proxyBodyWithoutContentTypeIsLeftOut(): void
+    {
+        $e = $this->callError($this->client(self::respond(502, 'upstream reset')));
+
+        self::assertSame('HTTP 502 Bad Gateway', $e->getMessage());
     }
 
     #[Test]
     public function longProxyBodyIsCutTo1024Bytes(): void
     {
-        $e = $this->callError($this->client(self::respond(502, str_repeat('a', 2000))));
+        $e = $this->callError($this->client(self::respond(502, str_repeat('a', 2000), ['Content-Type' => 'text/plain'])));
 
-        self::assertSame('HTTP 502: ' . str_repeat('a', 1024), $e->getMessage());
+        self::assertSame('HTTP 502 Bad Gateway: ' . str_repeat('a', 1024), $e->getMessage());
     }
 
     #[Test]
     public function proxyBodyIsCutAtACharacterBoundary(): void
     {
-        $e = $this->callError($this->client(self::respond(502, str_repeat('a', 1023) . "\u{e9}zz")));
+        $e = $this->callError($this->client(self::respond(502, str_repeat('a', 1023) . "\u{e9}zz", ['Content-Type' => 'text/plain'])));
 
-        self::assertSame('HTTP 502: ' . str_repeat('a', 1023), $e->getMessage());
+        self::assertSame('HTTP 502 Bad Gateway: ' . str_repeat('a', 1023), $e->getMessage());
     }
 
     #[Test]
     public function proxyBodyThatIsNotUtf8IsLeftOut(): void
     {
-        $e = $this->callError($this->client(self::respond(502, "\xff\xfe")));
+        $e = $this->callError($this->client(self::respond(502, "\xff\xfe", ['Content-Type' => 'text/plain'])));
 
         self::assertSame(Code::Unavailable, $e->code());
-        self::assertSame('HTTP 502', $e->getMessage());
+        self::assertSame('HTTP 502 Bad Gateway', $e->getMessage());
     }
 
     #[Test]
@@ -353,7 +444,16 @@ final class ClientTest extends TestCase
         $e = $this->callError($this->client(self::respond(502, '{"error":"bad gateway"}', ['Content-Type' => 'application/json'])));
 
         self::assertSame(Code::Unavailable, $e->code());
-        self::assertSame('HTTP 502: {"error":"bad gateway"}', $e->getMessage());
+        self::assertSame('HTTP 502 Bad Gateway: {"error":"bad gateway"}', $e->getMessage());
+    }
+
+    #[Test]
+    public function statusWithoutReasonPhraseIsJustTheCode(): void
+    {
+        $e = $this->callError($this->client(self::respond(599)));
+
+        self::assertSame(Code::Unknown, $e->code());
+        self::assertSame('HTTP 599', $e->getMessage());
     }
 
     #[Test]
@@ -362,7 +462,7 @@ final class ClientTest extends TestCase
         $e = $this->callError($this->client(self::respond(503)));
 
         self::assertSame(Code::Unavailable, $e->code());
-        self::assertSame('HTTP 503', $e->getMessage());
+        self::assertSame('HTTP 503 Service Unavailable', $e->getMessage());
     }
 
     #[Test]
@@ -445,6 +545,7 @@ final class ClientTest extends TestCase
 
         self::assertSame(Code::DeadlineExceeded, $e->code());
         self::assertInstanceOf(FakeNetworkException::class, $e->getPrevious());
+        self::assertFalse($e->isWireError());
     }
 
     #[Test]

@@ -44,8 +44,7 @@ final class ErrorBody
         $code = \is_string($data['code'] ?? null) ? Code::tryFrom($data['code']) ?? $fallback : $fallback;
         $message = \is_string($data['message'] ?? null) ? $data['message'] : '';
 
-        return (new ConnectException($code, $message, self::details($data['details'] ?? null)))
-            ->withMetadata($metadata);
+        return ConnectException::received($code, $message, self::details($data['details'] ?? null), $metadata);
     }
 
     /**
