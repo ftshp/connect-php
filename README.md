@@ -98,7 +98,7 @@ require __DIR__ . '/vendor/autoload.php';
 
 final class Greeter implements GreetServiceInterface
 {
-    public function greet(GreetRequest $request, Context $context): GreetResponse
+    public function greet(GreetRequest $request, Context $context = new Context()): GreetResponse
     {
         return new GreetResponse(['greeting' => 'Hello, ' . $request->getName() . '!']);
     }
@@ -199,7 +199,7 @@ interface GreetServiceInterface
      * @throws ConnectException
      */
     #[Procedure('Greet', Idempotency::NoSideEffects)]
-    public function greet(GreetRequest $request, Context $context): GreetResponse;
+    public function greet(GreetRequest $request, Context $context = new Context()): GreetResponse;
 }
 ```
 
@@ -224,6 +224,8 @@ final class GreetServiceClient implements GreetServiceInterface
 ```
 
 A server implementation is any class that implements the interface. `Server::register()` reads the `#[Service]` and `#[Procedure]` attributes, so there is no generated server class, and one `Server` holds every service of an application. Method names are lowerCamel, and deprecated RPCs get `@deprecated`. The generated code passes PHPStan at `level: max`.
+
+Every method takes the request first and an optional `Context` second, as in connect-es. The interface and the client both default `$context` to `new Context()`, so code that types against the interface, a test double included, can call `$greeter->greet($request)`. An implementation has to declare the same default, because PHP rejects a class that makes an optional parameter of its interface required. The server always passes a `Context` to the handler. The default is a new `Context` and not `null` because handlers and interceptors write response headers and trailers into it.
 
 `Context` carries the request headers and the timeout, and after the call it holds the response headers and trailers:
 

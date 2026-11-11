@@ -20,7 +20,7 @@ interface WarehouseInterface
      * @throws ConnectException
      */
     #[Procedure('WMSCheck')]
-    public function wMSCheck(PBClass $request, Context $context): Inner;
+    public function wMSCheck(PBClass $request, Context $context = new Context()): Inner;
 
     /**
      * Old returns nothing useful.
@@ -30,5 +30,5 @@ interface WarehouseInterface
      * @throws ConnectException
      */
     #[Procedure('Old')]
-    public function old(PBClass $request, Context $context): PBClass;
+    public function old(PBClass $request, Context $context = new Context()): PBClass;
 }

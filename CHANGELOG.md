@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## Unreleased
 
+### Changed
+
+- Generated interfaces declare `Context $context = new Context()`, the same as the generated client, so code typed against the interface can leave out the context. This breaks server implementations, which PHP now rejects unless they declare the default too. To migrate, add ` = new Context()` after `Context $context` in every method that implements a generated interface.
+
 ## 0.1.0 - 2026-11-02
 
 ### Added

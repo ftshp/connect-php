@@ -22,17 +22,17 @@ interface EchoInterface
      * @throws ConnectException
      */
     #[Procedure('Echo')]
-    public function echo(EchoRequest $request, Context $context): EchoResponse;
+    public function echo(EchoRequest $request, Context $context = new Context()): EchoResponse;
 
     /**
      * @throws ConnectException
      */
     #[Procedure('Peek', Idempotency::NoSideEffects)]
-    public function peek(EchoRequest $request, Context $context): EchoResponse;
+    public function peek(EchoRequest $request, Context $context = new Context()): EchoResponse;
 
     /**
      * @throws ConnectException
      */
     #[Procedure('Fail')]
-    public function fail(FailRequest $request, Context $context): PBEmpty;
+    public function fail(FailRequest $request, Context $context = new Context()): PBEmpty;
 }

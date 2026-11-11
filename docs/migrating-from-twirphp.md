@@ -36,11 +36,11 @@ interface Stock
 // connect-php
 interface StockInterface
 {
-    public function availabilityGet(AvailabilityGetRequest $request, Context $context): AvailabilityGetResponse;
+    public function availabilityGet(AvailabilityGetRequest $request, Context $context = new Context()): AvailabilityGetResponse;
 }
 ```
 
-On the client `$context` defaults to a new `Context`, so most calls become `$stock->availabilityGet($request)`. Request headers move from the context array to `Headers`:
+The interface and the client default `$context` to a new `Context`, so most calls become `$stock->availabilityGet($request)`, also where the code only knows `StockInterface`. A server implementation repeats `= new Context()` in its own signature, since PHP does not let an implementation make the parameter required. Request headers move from the context array to `Headers`:
 
 ```php
 // twirphp
@@ -56,7 +56,7 @@ A server implementation reads request headers from `$context->requestHeaders` an
 twirphp code often passes the incoming `$ctx` on to the next client call. A connect-php `Context` belongs to one call, so a handler that calls another service builds a new one with the headers it means to forward and the time that is left:
 
 ```php
-public function availabilityGet(AvailabilityGetRequest $request, Context $context): AvailabilityGetResponse
+public function availabilityGet(AvailabilityGetRequest $request, Context $context = new Context()): AvailabilityGetResponse
 {
     $forwarded = new Context(
         new Headers(['authorization' => $context->requestHeaders->get('authorization') ?? '']),
