@@ -10,7 +10,7 @@ The scope is the Connect protocol for unary RPCs. Streaming, gRPC and gRPC-Web a
 
 ## Setup
 
-You need PHP 8.5 with `zlib`, Composer, Go and buf. The conformance suite also needs the `pcntl` and `posix` extensions.
+You need PHP 8.4 or newer with `zlib`, Composer, Go and buf. The conformance suite also needs the `pcntl` and `posix` extensions.
 
 ```sh
 composer install
@@ -36,4 +36,4 @@ There is no CLA and no DCO sign-off. By opening a pull request you agree that yo
 
 ## Code style
 
-The code targets PHP 8.5 with strict types. Classes are `final` and properties `readonly` unless there is a reason otherwise. Comments are for things the code cannot say; the code and its names should explain the rest. The runtime depends only on the PSR HTTP interfaces and `google/protobuf`, so ask in an issue before adding a dependency.
+The code runs on PHP 8.4 and newer, with strict types. CI tests every supported PHP version, so a language feature or function that is newer than 8.4 fails there. Classes are `final` and properties `readonly` unless there is a reason otherwise. Comments are for things the code cannot say; the code and its names should explain the rest. The runtime depends only on the PSR HTTP interfaces and `google/protobuf`, so ask in an issue before adding a dependency.

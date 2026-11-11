@@ -6,7 +6,7 @@
 
 A PHP implementation of the Connect protocol for unary RPC, with a PSR-18 client and a PSR-15 server.
 
-This is an unofficial, community implementation of the Connect protocol. It is not affiliated with Buf or the Connect project. It works with any other Connect client or server, connect-go and curl included, and needs PHP 8.5 or newer.
+This is an unofficial, community implementation of the Connect protocol. It is not affiliated with Buf or the Connect project. It works with any other Connect client or server, connect-go and curl included, and needs PHP 8.4 or newer.
 
 | Feature | Client | Server |
 |---|---|---|
@@ -164,7 +164,7 @@ $ curl -H 'Content-Type: application/json' -d '{"name": "Jane"}' http://localhos
 composer require ftshp/connect
 ```
 
-The library needs PHP `^8.5`, `ext-zlib`, `google/protobuf` and the PSR HTTP interfaces. It works with the protobuf C extension and with the pure PHP runtime. You provide the PSR-7 and PSR-17 implementation and, for the client, a PSR-18 HTTP client.
+The library needs PHP 8.4 or newer, `ext-zlib`, `google/protobuf` 5.36 or a later 5.x and the PSR HTTP interfaces. Version 5.36 is the runtime of protobuf 36.0, the release whose protoc-gen-php the generated code needs, and protobuf does not support generated code that is newer than its runtime. The library works with the protobuf C extension and with the pure PHP runtime, and CI runs the tests and the conformance suite with both on every supported PHP version. The extension replaces the classes of `google/protobuf`, so install the extension version that matches the package. You provide the PSR-7 and PSR-17 implementation and, for the client, a PSR-18 HTTP client.
 
 The code generator is a protoc plugin written in Go. Download a binary for Linux, macOS or Windows from the [GitHub releases](https://github.com/ftshp/connect-php/releases) and put it on your `PATH`, or build it with Go:
 
