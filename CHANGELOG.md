@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-11
+
 This release has one breaking change. Generated interfaces declare `Context $context = new Context()`, the same as the generated client, so code typed against the interface can leave out the context. PHP rejects a server implementation that keeps `Context $context` without the default. To upgrade, regenerate the code and add ` = new Context()` after `Context $context` in every method that implements a generated interface. The other entries keep code written for 0.1 working. Some of them change what goes over the wire so that it matches the Connect protocol and connect-go, as described under Changed.
 
 ### Added
@@ -66,5 +68,6 @@ This release has one breaking change. Generated interfaces declare `Context $con
 - A synchronous PSR-18 client cannot cancel a call that is in flight.
 - Four `cancel-after-close-send` conformance cases fail for that reason.
 
-[Unreleased]: https://github.com/ftshp/connect-php/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ftshp/connect-php/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ftshp/connect-php/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ftshp/connect-php/releases/tag/v0.1.0
