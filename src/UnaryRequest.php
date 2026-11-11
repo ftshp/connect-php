@@ -12,6 +12,8 @@ final class UnaryRequest
     private \Closure|Message $message;
 
     /**
+     * @internal the client and the server build requests; interceptors receive them
+     *
      * @param MethodDescriptor<Message, Message> $method
      * @param (\Closure(): Message)|Message $message
      */

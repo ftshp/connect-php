@@ -11,6 +11,8 @@ use Google\Protobuf\Internal\Message;
 final readonly class ServiceDescriptor
 {
     /**
+     * @internal use fromInterface()
+     *
      * @param class-string $interface
      * @param array<string, MethodDescriptor<Message, Message>> $methods keyed by proto method name
      */

@@ -19,6 +19,17 @@ final class ContextTest extends TestCase
     }
 
     #[Test]
+    public function readingMethodBeforeACallStartsThrows(): void
+    {
+        try {
+            (new Context())->method;
+            self::fail('expected a LogicException');
+        } catch (\LogicException $e) {
+            self::assertSame('no call has started with this Context', $e->getMessage());
+        }
+    }
+
+    #[Test]
     public function beginSetsMethodAndDeadline(): void
     {
         $method = ServiceDescriptor::fromInterface(EchoInterface::class)->methods['Echo'];

@@ -6,9 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## Unreleased
 
+### Added
+
+- `Headers` is iterable. `foreach ($headers as $name => $values)` yields every header with raw values, including `-bin` names, for which `toArray()` returns base64.
+
 ### Changed
 
 - Generated interfaces declare `Context $context = new Context()`, the same as the generated client, so code typed against the interface can leave out the context. This breaks server implementations, which PHP now rejects unless they declare the default too. To migrate, add ` = new Context()` after `Context $context` in every method that implements a generated interface.
+- The `UnaryRequest` constructor, the `ServiceDescriptor` constructor and `Headers::replace()` are marked `@internal`, like `Context::begin()` already was. They work as before but are outside the backward compatibility promise. `Server::register()` still accepts a descriptor from `ServiceDescriptor::fromInterface()`.
+- The docblocks of `Headers::toArray()` and `Headers::fromPsr()` say that they use the wire form, with base64 values for `-bin` names, and the `Codec` and `Compression` interfaces document which exceptions an implementation throws.
+
+### Fixed
+
+- Reading `Context::$method` on a `Context` that no call has started throws a `\LogicException` that says so, instead of an `\Error` about an uninitialized property. The property keeps its `MethodDescriptor` type.
 
 ## 0.1.0 - 2026-11-02
 
