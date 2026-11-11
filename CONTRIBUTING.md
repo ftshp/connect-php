@@ -6,6 +6,8 @@ Issues and pull requests go to [github.com/ftshp/connect-php](https://github.com
 
 Open an issue before you add or change anything in the public API: a new class, method, constructor argument or generated code shape. The library keeps its API small on purpose, and it is easier to agree on the shape before the code exists. Bug fixes and internal changes do not need an issue first.
 
+A change has to keep the [backward compatibility promise](docs/compatibility.md). One that breaks it waits for a release that may break it, deprecates the old API first where it can, and describes the migration in the changelog.
+
 The scope is the Connect protocol for unary RPCs. Streaming, gRPC and gRPC-Web are out of scope, as the README explains.
 
 ## Setup

@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+This release has one breaking change. Generated interfaces declare `Context $context = new Context()`, the same as the generated client, so code typed against the interface can leave out the context. PHP rejects a server implementation that keeps `Context $context` without the default. To upgrade, regenerate the code and add ` = new Context()` after `Context $context` in every method that implements a generated interface. The other entries keep code written for 0.1 working. Some of them change what goes over the wire so that it matches the Connect protocol and connect-go, as described under Changed.
+
 ### Added
 
 - Support for PHP 8.4. CI runs the tests and the conformance suite on PHP 8.4 and 8.5, each with the protobuf C extension and with the pure PHP runtime.
@@ -16,11 +18,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The leading comment of a service becomes the docblock of the generated interface and client, and `option deprecated = true` on a service marks both `@deprecated`.
 - Release builds of the plugin write their version into the header of generated files, as `// versions: protoc-gen-connect-php v0.2.0`. Builds without a release tag leave the line out.
 - The README documents the naming rules for generated code, which later releases keep, the minimum protoc-gen-php version (protobuf 36.0) and the `ftshp/connect` constraint that packages with generated code need.
+- `docs/compatibility.md` states the backward compatibility promise. It covers public classes and methods with their parameter names, the generated code and the runtime API it calls, and wire defaults such as the 4 MiB message limits and the empty message of `unknown` errors. It leaves out `Ftshp\Connect\Internal`, `@internal` members and the position of optional `Client` and `Server` constructor arguments, and lists `Interceptor`, `Codec`, `Compression` and the generated interfaces as the interfaces applications may implement.
+- The README and `docs/compatibility.md` explain that Guzzle's default `decode_content: true` lets curl inflate a gzip response before the size limit applies, and the README example creates the Guzzle client with `decode_content: false`.
 
 ### Changed
 
-- Generated interfaces declare `Context $context = new Context()`, the same as the generated client, so code typed against the interface can leave out the context. This breaks server implementations, which PHP now rejects unless they declare the default too. To migrate, add ` = new Context()` after `Context $context` in every method that implements a generated interface.
-- The `UnaryRequest` constructor, the `ServiceDescriptor` constructor and `Headers::replace()` are marked `@internal`, like `Context::begin()` already was. They work as before but are outside the backward compatibility promise. `Server::register()` still accepts a descriptor from `ServiceDescriptor::fromInterface()`.
+- Generated interfaces default the context parameter to `new Context()`. This is the breaking change described above.
+- The `UnaryRequest` constructor, the `ServiceDescriptor` constructor and `Headers::replace()` are marked `@internal`, like `Context::begin()` already was. They work as before but are outside the [backward compatibility promise](docs/compatibility.md). `Server::register()` still accepts a descriptor from `ServiceDescriptor::fromInterface()`.
 - The client sets the deadline when the call starts and again when an interceptor changes `timeoutMs`, as connect-go does with `context.WithTimeout`. Each attempt of a retry interceptor sends the time left in `Connect-Timeout-Ms`, where it sent the full timeout before, and an attempt that starts after the deadline fails with `deadline_exceeded` without sending a request. A `timeoutMs` longer than 10 digits no longer throws `\InvalidArgumentException`; the client leaves the header out.
 - The server sends the metadata of a `ConnectException` that a handler or interceptor throws as response headers, as connect-go does. It skips protocol headers, including the `grpc-` status headers that connect-go treats as protocol headers, names starting with `trailer-`, names and values that `Headers` would reject, and the metadata of an error that a `Client` received from another server.
 - The server rejects a `Connect-Protocol-Version` header other than `1` and a GET `connect` parameter other than `v1` with `invalid_argument`, also when `requireProtocolHeader` is false. Requests without them are still accepted unless the option is set.
