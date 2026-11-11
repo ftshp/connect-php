@@ -216,4 +216,19 @@ final class HeadersTest extends TestCase
 
         self::assertSame(['connect-thing' => ['a'], 'x-new' => ['b', 'c']], $headers->toArray());
     }
+
+    #[Test]
+    public function iterationYieldsRawValues(): void
+    {
+        $headers = new Headers(['X-A' => ['1', '2']]);
+        $headers->set('trace-bin', "\r\n\x00");
+        $headers->set('123', 'x');
+
+        $seen = [];
+        foreach ($headers as $name => $values) {
+            $seen[] = [$name, $values];
+        }
+
+        self::assertSame([['x-a', ['1', '2']], ['trace-bin', ["\r\n\x00"]], ['123', ['x']]], $seen);
+    }
 }

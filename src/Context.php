@@ -12,7 +12,12 @@ final class Context
     public readonly Headers $responseTrailers;
     public private(set) ?float $deadline = null;
     /** @var MethodDescriptor<Message, Message> */
-    public private(set) MethodDescriptor $method;
+    public MethodDescriptor $method {
+        get => $this->startedMethod ?? throw new \LogicException('no call has started with this Context');
+    }
+
+    /** @var ?MethodDescriptor<Message, Message> */
+    private ?MethodDescriptor $startedMethod = null;
 
     public function __construct(
         public readonly Headers $requestHeaders = new Headers(),
@@ -38,7 +43,7 @@ final class Context
      */
     public function begin(MethodDescriptor $method): void
     {
-        $this->method = $method;
+        $this->startedMethod = $method;
         $this->deadline = $this->timeoutMs === null ? null : microtime(true) + $this->timeoutMs / 1000;
     }
 }

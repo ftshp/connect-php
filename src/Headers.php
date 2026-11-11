@@ -4,7 +4,13 @@ declare(strict_types=1);
 
 namespace Ftshp\Connect;
 
-final class Headers
+/**
+ * Names are case-insensitive and stored in lowercase. Values of names ending in -bin are raw bytes here
+ * and unpadded base64 on the wire.
+ *
+ * @implements \IteratorAggregate<string, list<string>>
+ */
+final class Headers implements \IteratorAggregate
 {
     /** @var array<array-key, list<string>> */
     private array $values = [];
@@ -22,7 +28,10 @@ final class Headers
     }
 
     /**
-     * @param array<array-key, array<string>> $headers as returned by PSR-7 getHeaders()
+     * Builds headers from their wire form, as PSR-7 getHeaders() returns it: base64 values of -bin names are
+     * decoded, and names and values are not validated. Use the constructor for raw values.
+     *
+     * @param array<array-key, array<string>> $headers
      */
     public static function fromPsr(array $headers): self
     {
@@ -67,6 +76,9 @@ final class Headers
         unset($this->values[strtolower($name)]);
     }
 
+    /**
+     * @internal
+     */
     public function replace(self $other): void
     {
         $this->values = $other->values;
@@ -83,6 +95,9 @@ final class Headers
     }
 
     /**
+     * Returns the wire form, ready for PSR-7 withHeader(): values of -bin names are unpadded base64.
+     * Iterate over the headers for raw values.
+     *
      * @return array<array-key, list<string>>
      */
     public function toArray(): array
@@ -96,6 +111,17 @@ final class Headers
         }
 
         return $result;
+    }
+
+    /**
+     * @return \Traversable<string, list<string>>
+     */
+    #[\Override]
+    public function getIterator(): \Traversable
+    {
+        foreach ($this->values as $name => $values) {
+            yield (string) $name => $values;
+        }
     }
 
     private static function validate(string $name, string $value): string
