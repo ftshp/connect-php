@@ -51,7 +51,16 @@ func TestPHPClass(t *testing.T) {
 }
 
 func TestLcfirst(t *testing.T) {
-	for in, want := range map[string]string{"AvailabilityGet": "availabilityGet", "WMSCheck": "wMSCheck", "echo": "echo", "": ""} {
+	for in, want := range map[string]string{
+		"SayHello":       "sayHello",
+		"HTTPGet":        "hTTPGet",
+		"GetURL":         "getURL",
+		"X509Verify":     "x509Verify",
+		"_Hidden":        "_Hidden",
+		"snake_case_rpc": "snake_case_rpc",
+		"echo":           "echo",
+		"":               "",
+	} {
 		if got := lcfirst(in); got != want {
 			t.Errorf("lcfirst(%q) = %q, want %q", in, got, want)
 		}

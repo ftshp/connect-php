@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - `Headers` is iterable. `foreach ($headers as $name => $values)` yields every header with raw values, including `-bin` names, for which `toArray()` returns base64.
 - `ConnectException` takes its metadata as an optional fifth constructor argument, `metadata:`.
+- The plugin accepts proto files that use editions, up to edition 2024. protoc and buf refused to run it on them before.
+- The leading comment of a service becomes the docblock of the generated interface and client, and `option deprecated = true` on a service marks both `@deprecated`.
+- Release builds of the plugin write their version into the header of generated files, as `// versions: protoc-gen-connect-php v0.2.0`. Builds without a release tag leave the line out.
+- The README documents the naming rules for generated code, which later releases keep, the minimum protoc-gen-php version (protobuf 36.0) and the `ftshp/connect` constraint that packages with generated code need.
 
 ### Changed
 
@@ -21,6 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The server accepts `Connect-Timeout-Ms: 0` and answers `deadline_exceeded` where it answered `invalid_argument`. A handler whose deadline has passed by the time the interceptors call it is not run, and the call ends with `deadline_exceeded`.
 - The server does not compress a response with an encoding that `Accept-Encoding` refuses with `q=0`, in any position among the parameters.
 - An error built from a response that is not a Connect error has the status line as its message, such as `HTTP 502 Bad Gateway`. The body is appended only when it is `text/plain` or JSON, so HTML pages from proxies stay out of exception messages and logs.
+- Proto comments copied into generated docblocks have `@` written as `\@` and `*/` as `{@*}`, as protoc-gen-php does, so a comment such as `@return int` no longer turns into a PHPDoc tag that static analysis reads.
+- The generated client creates each `MethodDescriptor` in a static variable of the method itself and has no private `xMethod()` helpers, so a service can have RPCs such as `Get` and `GetMethod` side by side.
 - The docblocks of `Headers::toArray()` and `Headers::fromPsr()` say that they use the wire form, with base64 values for `-bin` names, and the `Codec` and `Compression` interfaces document which exceptions an implementation throws.
 
 ### Deprecated
@@ -29,6 +35,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The plugin fails with an error when `<Service>Interface` or `<Service>Client` has the same name, ignoring case, as a message, an enum or another service class in the same namespace. protoc failed on the duplicate file when both were in one run, and separate runs overwrote one class with the other.
+- The plugin fails with an error on an RPC whose name starts with `__`, where it generated a method that PHP rejects or treats as magic, such as `__construct`.
 - The copy that `ConnectException::withMetadata()` returns keeps the file, line and trace of the original exception. The copy of an error that a `Client` received is still treated as received, so the server does not forward its metadata.
 - Reading `Context::$method` on a `Context` that no call has started throws a `\LogicException` that says so, instead of an `\Error` about an uninitialized property. The property keeps its `MethodDescriptor` type.
 

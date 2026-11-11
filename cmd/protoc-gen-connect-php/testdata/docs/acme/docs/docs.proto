@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package acme.docs;
+
+message Note {
+  string text = 1;
+}
+
+// Notebook keeps notes.
+//
+// @author someone@example.com
+// Use {@link Note} for */ and /* in prose.
+service Notebook {
+  option deprecated = true;
+
+  // Write stores a note.
+  //
+  // @param string $x not a parameter
+  // @return int not the return type
+  // @deprecated is prose here
+  rpc Write(Note) returns (Note);
+}
+
+service Archive {
+  option deprecated = true;
+
+  rpc Read(Note) returns (Note);
+}
+
+// Journal has a comment and no options.
+service Journal {
+  rpc Read(Note) returns (Note);
+}

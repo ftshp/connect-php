@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/pluginpb"
 )
@@ -22,10 +23,12 @@ var templateFS embed.FS
 var templates = template.Must(template.ParseFS(templateFS, "templates/*.tmpl"))
 
 type serviceFile struct {
+	Version   string
 	Source    string
 	Namespace string
 	Service   string
 	Name      string
+	Doc       []string
 	Uses      []string
 	Methods   []method
 }
@@ -39,15 +42,18 @@ type method struct {
 	Doc         []string
 }
 
-func generate(req *pluginpb.CodeGeneratorRequest, stderr io.Writer) *pluginpb.CodeGeneratorResponse {
+func generate(req *pluginpb.CodeGeneratorRequest, version string, stderr io.Writer) *pluginpb.CodeGeneratorResponse {
 	resp := &pluginpb.CodeGeneratorResponse{
-		SupportedFeatures: proto.Uint64(uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL)),
+		SupportedFeatures: proto.Uint64(uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL | pluginpb.CodeGeneratorResponse_FEATURE_SUPPORTS_EDITIONS)),
+		MinimumEdition:    proto.Int32(int32(descriptorpb.Edition_EDITION_PROTO2)),
+		MaximumEdition:    proto.Int32(int32(descriptorpb.Edition_EDITION_2024)),
 	}
 	files, err := protodesc.NewFiles(&descriptorpb.FileDescriptorSet{File: req.ProtoFile})
 	if err != nil {
 		resp.Error = proto.String(err.Error())
 		return resp
 	}
+	classes := typeClasses(files)
 	for _, name := range req.FileToGenerate {
 		fd, err := files.FindFileByPath(name)
 		if err != nil {
@@ -55,7 +61,7 @@ func generate(req *pluginpb.CodeGeneratorRequest, stderr io.Writer) *pluginpb.Co
 			return resp
 		}
 		for i := range fd.Services().Len() {
-			generated, err := generateService(fd, fd.Services().Get(i), stderr)
+			generated, err := generateService(fd, fd.Services().Get(i), version, classes, stderr)
 			if err != nil {
 				resp.Error = proto.String(err.Error())
 				return resp
@@ -66,12 +72,48 @@ func generate(req *pluginpb.CodeGeneratorRequest, stderr io.Writer) *pluginpb.Co
 	return resp
 }
 
-func generateService(fd protoreflect.FileDescriptor, sd protoreflect.ServiceDescriptor, stderr io.Writer) ([]*pluginpb.CodeGeneratorResponse_File, error) {
+// typeClasses maps the lower-cased class name of every message and enum in
+// the request to a description of its proto type. PHP class names are
+// case-insensitive.
+func typeClasses(files *protoregistry.Files) map[string]string {
+	classes := map[string]string{}
+	var walk func(messages protoreflect.MessageDescriptors, enums protoreflect.EnumDescriptors)
+	walk = func(messages protoreflect.MessageDescriptors, enums protoreflect.EnumDescriptors) {
+		for i := range enums.Len() {
+			classes[strings.ToLower(typeClass(enums.Get(i)))] = "enum " + string(enums.Get(i).FullName())
+		}
+		for i := range messages.Len() {
+			md := messages.Get(i)
+			if md.IsMapEntry() {
+				continue
+			}
+			classes[strings.ToLower(typeClass(md))] = "message " + string(md.FullName())
+			walk(md.Messages(), md.Enums())
+		}
+	}
+	files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
+		walk(fd.Messages(), fd.Enums())
+		return true
+	})
+	return classes
+}
+
+func generateService(fd protoreflect.FileDescriptor, sd protoreflect.ServiceDescriptor, version string, classes map[string]string, stderr io.Writer) ([]*pluginpb.CodeGeneratorResponse_File, error) {
 	data := serviceFile{
+		Version:   version,
 		Source:    fd.Path(),
 		Namespace: fileNamespace(fd),
 		Service:   string(sd.FullName()),
 		Name:      string(sd.Name()),
+		Doc:       docLines(fd.SourceLocations().ByDescriptor(sd).LeadingComments, sd.Options().(*descriptorpb.ServiceOptions).GetDeprecated()),
+	}
+	for _, suffix := range []string{"Interface", "Client"} {
+		class := qualify(data.Namespace, data.Name+suffix)
+		key := strings.ToLower(class)
+		if owner, ok := classes[key]; ok {
+			return nil, fmt.Errorf("%s: class %s for the service collides with %s; rename one of them", sd.FullName(), class, owner)
+		}
+		classes[key] = "service " + string(sd.FullName())
 	}
 	var unary []protoreflect.MethodDescriptor
 	var messages []protoreflect.MessageDescriptor
@@ -93,21 +135,23 @@ func generateService(fd protoreflect.FileDescriptor, sd protoreflect.ServiceDesc
 	idempotent := false
 	owners := map[string]string{}
 	for _, md := range unary {
-		for _, name := range []string{lcfirst(string(md.Name())), lcfirst(string(md.Name())) + "Method"} {
-			key := strings.ToLower(name)
-			if other, ok := owners[key]; ok && other != string(md.Name()) {
-				return nil, fmt.Errorf("%s: RPCs %s and %s map to the same PHP method name %s", sd.FullName(), other, md.Name(), name)
-			}
-			owners[key] = string(md.Name())
+		name := lcfirst(string(md.Name()))
+		if strings.HasPrefix(name, "__") {
+			return nil, fmt.Errorf("%s/%s: PHP reserves method names starting with __ for magic methods; rename the RPC", sd.FullName(), md.Name())
 		}
+		key := strings.ToLower(name)
+		if other, ok := owners[key]; ok {
+			return nil, fmt.Errorf("%s: RPCs %s and %s map to the same PHP method name %s", sd.FullName(), other, md.Name(), name)
+		}
+		owners[key] = string(md.Name())
 		opts := md.Options().(*descriptorpb.MethodOptions)
 		m := method{
 			Name:        string(md.Name()),
-			PHPName:     lcfirst(string(md.Name())),
+			PHPName:     name,
 			Input:       refs[md.Input().FullName()],
 			Output:      refs[md.Output().FullName()],
 			Idempotency: idempotency(opts.GetIdempotencyLevel()),
-			Doc:         docLines(fd.SourceLocations().ByDescriptor(md).LeadingComments, opts.GetDeprecated()),
+			Doc:         docLines(fd.SourceLocations().ByDescriptor(md).LeadingComments, opts.GetDeprecated(), "@throws ConnectException"),
 		}
 		idempotent = idempotent || m.Idempotency != "Unknown"
 		data.Methods = append(data.Methods, m)
@@ -153,7 +197,7 @@ func resolveClasses(namespace string, messages []protoreflect.MessageDescriptor,
 	refs := map[protoreflect.FullName]string{}
 	var imports []string
 	for _, md := range messages {
-		ns, short := splitClass(messageClass(md))
+		ns, short := splitClass(typeClass(md))
 		if ns == namespace && !taken[strings.ToLower(short)] {
 			refs[md.FullName()] = short
 		}
@@ -166,7 +210,7 @@ func resolveClasses(namespace string, messages []protoreflect.MessageDescriptor,
 		if _, ok := refs[md.FullName()]; ok {
 			continue
 		}
-		class := messageClass(md)
+		class := typeClass(md)
 		ns, short := splitClass(class)
 		key := strings.ToLower(short)
 		switch {
@@ -195,17 +239,21 @@ func fileNamespace(fd protoreflect.FileDescriptor) string {
 	return phpNamespace(string(fd.Package()), override)
 }
 
-func messageClass(md protoreflect.MessageDescriptor) string {
-	fd := md.ParentFile()
+// typeClass returns the class protoc-gen-php writes for a message or enum.
+func typeClass(desc protoreflect.Descriptor) string {
+	fd := desc.ParentFile()
 	var path []string
-	for d := protoreflect.Descriptor(md); d != fd; d = d.Parent() {
+	for d := desc; d != fd; d = d.Parent() {
 		path = append([]string{string(d.Name())}, path...)
 	}
-	class := phpClass(path, fd.Options().(*descriptorpb.FileOptions).GetPhpClassPrefix(), string(fd.Package()))
-	if ns := fileNamespace(fd); ns != "" {
-		return ns + `\` + class
+	return qualify(fileNamespace(fd), phpClass(path, fd.Options().(*descriptorpb.FileOptions).GetPhpClassPrefix(), string(fd.Package())))
+}
+
+func qualify(namespace, class string) string {
+	if namespace == "" {
+		return class
 	}
-	return class
+	return namespace + `\` + class
 }
 
 func splitClass(class string) (namespace, short string) {
@@ -233,20 +281,28 @@ func idempotency(level descriptorpb.MethodOptions_IdempotencyLevel) string {
 	return "Unknown"
 }
 
-func docLines(comment string, deprecated bool) []string {
+// docLines turns a proto comment into docblock lines. "@" and "*/" are
+// escaped the way protoc-gen-php escapes them, so a comment never adds a
+// PHPDoc tag or ends the docblock.
+func docLines(comment string, deprecated bool, tags ...string) []string {
 	var lines []string
 	for line := range strings.SplitSeq(strings.TrimRight(comment, " \n"), "\n") {
 		line = strings.TrimRight(strings.TrimPrefix(line, " "), " \t")
-		lines = append(lines, strings.ReplaceAll(line, "*/", `*\/`))
+		lines = append(lines, phpdocEscaper.Replace(line))
 	}
 	for len(lines) > 0 && lines[0] == "" {
 		lines = lines[1:]
 	}
-	if len(lines) > 0 {
-		lines = append(lines, "")
-	}
 	if deprecated {
-		lines = append(lines, "@deprecated", "")
+		tags = append([]string{"@deprecated"}, tags...)
 	}
-	return append(lines, "@throws ConnectException")
+	for _, tag := range tags {
+		if len(lines) > 0 {
+			lines = append(lines, "")
+		}
+		lines = append(lines, tag)
+	}
+	return lines
 }
+
+var phpdocEscaper = strings.NewReplacer("*/", "{@*}", "@", `\@`)

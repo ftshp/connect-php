@@ -9,9 +9,19 @@ message Outer {
 }
 
 service Warehouse {
-  rpc WMSCheck(Class) returns (Outer.Inner);
+  rpc HTTPGet(Class) returns (Outer.Inner);
+  rpc GetURL(Class) returns (Class);
+  rpc X509Verify(Class) returns (Class);
+  rpc _Hidden(Class) returns (Class);
+  rpc snake_case_rpc(Class) returns (Class);
+  rpc Get(Class) returns (Class);
+  rpc GetMethod(Class) returns (Class);
   // Old returns nothing useful.
   rpc Old(Class) returns (Class) {
     option deprecated = true;
   }
+}
+
+service lowercase {
+  rpc Ping(Class) returns (Class);
 }

@@ -19,27 +19,17 @@ final class BillingClient implements BillingInterface
 
     public function charge(Money $request, Context $context = new Context()): PBInvoice
     {
-        return $this->client->unary(self::chargeMethod(), $request, $context);
-    }
+        /** @var MethodDescriptor<Money, PBInvoice> $method */
+        static $method = new MethodDescriptor('acme.billing.v1.Billing', 'Charge', 'charge', Money::class, PBInvoice::class, Idempotency::Unknown);
 
-    /** @return MethodDescriptor<Money, PBInvoice> */
-    private static function chargeMethod(): MethodDescriptor
-    {
-        static $method = null;
-
-        return $method ??= new MethodDescriptor('acme.billing.v1.Billing', 'Charge', 'charge', Money::class, PBInvoice::class, Idempotency::Unknown);
+        return $this->client->unary($method, $request, $context);
     }
 
     public function lookup(\Acme\Common\Context $request, Context $context = new Context()): PBInvoice
     {
-        return $this->client->unary(self::lookupMethod(), $request, $context);
-    }
+        /** @var MethodDescriptor<\Acme\Common\Context, PBInvoice> $method */
+        static $method = new MethodDescriptor('acme.billing.v1.Billing', 'Lookup', 'lookup', \Acme\Common\Context::class, PBInvoice::class, Idempotency::Idempotent);
 
-    /** @return MethodDescriptor<\Acme\Common\Context, PBInvoice> */
-    private static function lookupMethod(): MethodDescriptor
-    {
-        static $method = null;
-
-        return $method ??= new MethodDescriptor('acme.billing.v1.Billing', 'Lookup', 'lookup', \Acme\Common\Context::class, PBInvoice::class, Idempotency::Idempotent);
+        return $this->client->unary($method, $request, $context);
     }
 }

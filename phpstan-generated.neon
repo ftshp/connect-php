@@ -1,0 +1,12 @@
+parameters:
+    level: max
+    paths:
+        - tests/Generated
+    excludePaths:
+        analyse:
+            - tests/Generated/GPBMetadata
+            - tests/Generated/Ftshp/Connect/Test/EchoRequest.php
+            - tests/Generated/Ftshp/Connect/Test/EchoResponse.php
+            - tests/Generated/Ftshp/Connect/Test/FailRequest.php
+            - tests/Generated/Ftshp/Connect/Test/PBEmpty.php
+    tmpDir: build/phpstan-generated

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"runtime/debug"
 	"strings"
 
@@ -37,6 +38,20 @@ func buildVersion() string {
 	return version
 }
 
+var (
+	releaseVersion = regexp.MustCompile(`^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$`)
+	pseudoVersion  = regexp.MustCompile(`\d{14}-[0-9a-f]{12}$`)
+)
+
+// headerVersion returns the version written into generated files, or "" for
+// development builds, whose version changes with every commit.
+func headerVersion(v string) string {
+	if !releaseVersion.MatchString(v) || pseudoVersion.MatchString(v) {
+		return ""
+	}
+	return "v" + v
+}
+
 func run(in io.Reader, out, stderr io.Writer) error {
 	raw, err := io.ReadAll(in)
 	if err != nil {
@@ -49,7 +64,7 @@ func run(in io.Reader, out, stderr io.Writer) error {
 	if req.GetParameter() != "" {
 		return fmt.Errorf("unknown option %q", req.GetParameter())
 	}
-	raw, err = proto.Marshal(generate(&req, stderr))
+	raw, err = proto.Marshal(generate(&req, headerVersion(buildVersion()), stderr))
 	if err != nil {
 		return err
 	}
