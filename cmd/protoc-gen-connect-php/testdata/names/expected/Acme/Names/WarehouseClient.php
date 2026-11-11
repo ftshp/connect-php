@@ -17,29 +17,67 @@ final class WarehouseClient implements WarehouseInterface
 {
     public function __construct(private readonly Client $client) {}
 
-    public function wMSCheck(PBClass $request, Context $context = new Context()): Inner
+    public function hTTPGet(PBClass $request, Context $context = new Context()): Inner
     {
-        return $this->client->unary(self::wMSCheckMethod(), $request, $context);
+        /** @var MethodDescriptor<PBClass, Inner> $method */
+        static $method = new MethodDescriptor('acme.names.Warehouse', 'HTTPGet', 'hTTPGet', PBClass::class, Inner::class, Idempotency::Unknown);
+
+        return $this->client->unary($method, $request, $context);
     }
 
-    /** @return MethodDescriptor<PBClass, Inner> */
-    private static function wMSCheckMethod(): MethodDescriptor
+    public function getURL(PBClass $request, Context $context = new Context()): PBClass
     {
-        static $method = null;
+        /** @var MethodDescriptor<PBClass, PBClass> $method */
+        static $method = new MethodDescriptor('acme.names.Warehouse', 'GetURL', 'getURL', PBClass::class, PBClass::class, Idempotency::Unknown);
 
-        return $method ??= new MethodDescriptor('acme.names.Warehouse', 'WMSCheck', 'wMSCheck', PBClass::class, Inner::class, Idempotency::Unknown);
+        return $this->client->unary($method, $request, $context);
+    }
+
+    public function x509Verify(PBClass $request, Context $context = new Context()): PBClass
+    {
+        /** @var MethodDescriptor<PBClass, PBClass> $method */
+        static $method = new MethodDescriptor('acme.names.Warehouse', 'X509Verify', 'x509Verify', PBClass::class, PBClass::class, Idempotency::Unknown);
+
+        return $this->client->unary($method, $request, $context);
+    }
+
+    public function _Hidden(PBClass $request, Context $context = new Context()): PBClass
+    {
+        /** @var MethodDescriptor<PBClass, PBClass> $method */
+        static $method = new MethodDescriptor('acme.names.Warehouse', '_Hidden', '_Hidden', PBClass::class, PBClass::class, Idempotency::Unknown);
+
+        return $this->client->unary($method, $request, $context);
+    }
+
+    public function snake_case_rpc(PBClass $request, Context $context = new Context()): PBClass
+    {
+        /** @var MethodDescriptor<PBClass, PBClass> $method */
+        static $method = new MethodDescriptor('acme.names.Warehouse', 'snake_case_rpc', 'snake_case_rpc', PBClass::class, PBClass::class, Idempotency::Unknown);
+
+        return $this->client->unary($method, $request, $context);
+    }
+
+    public function get(PBClass $request, Context $context = new Context()): PBClass
+    {
+        /** @var MethodDescriptor<PBClass, PBClass> $method */
+        static $method = new MethodDescriptor('acme.names.Warehouse', 'Get', 'get', PBClass::class, PBClass::class, Idempotency::Unknown);
+
+        return $this->client->unary($method, $request, $context);
+    }
+
+    public function getMethod(PBClass $request, Context $context = new Context()): PBClass
+    {
+        /** @var MethodDescriptor<PBClass, PBClass> $method */
+        static $method = new MethodDescriptor('acme.names.Warehouse', 'GetMethod', 'getMethod', PBClass::class, PBClass::class, Idempotency::Unknown);
+
+        return $this->client->unary($method, $request, $context);
     }
 
     public function old(PBClass $request, Context $context = new Context()): PBClass
     {
-        return $this->client->unary(self::oldMethod(), $request, $context);
-    }
+        /** @var MethodDescriptor<PBClass, PBClass> $method */
+        static $method = new MethodDescriptor('acme.names.Warehouse', 'Old', 'old', PBClass::class, PBClass::class, Idempotency::Unknown);
 
-    /** @return MethodDescriptor<PBClass, PBClass> */
-    private static function oldMethod(): MethodDescriptor
-    {
-        static $method = null;
-
-        return $method ??= new MethodDescriptor('acme.names.Warehouse', 'Old', 'old', PBClass::class, PBClass::class, Idempotency::Unknown);
+        return $this->client->unary($method, $request, $context);
     }
 }

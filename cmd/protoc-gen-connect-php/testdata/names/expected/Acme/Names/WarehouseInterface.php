@@ -19,8 +19,44 @@ interface WarehouseInterface
     /**
      * @throws ConnectException
      */
-    #[Procedure('WMSCheck')]
-    public function wMSCheck(PBClass $request, Context $context = new Context()): Inner;
+    #[Procedure('HTTPGet')]
+    public function hTTPGet(PBClass $request, Context $context = new Context()): Inner;
+
+    /**
+     * @throws ConnectException
+     */
+    #[Procedure('GetURL')]
+    public function getURL(PBClass $request, Context $context = new Context()): PBClass;
+
+    /**
+     * @throws ConnectException
+     */
+    #[Procedure('X509Verify')]
+    public function x509Verify(PBClass $request, Context $context = new Context()): PBClass;
+
+    /**
+     * @throws ConnectException
+     */
+    #[Procedure('_Hidden')]
+    public function _Hidden(PBClass $request, Context $context = new Context()): PBClass;
+
+    /**
+     * @throws ConnectException
+     */
+    #[Procedure('snake_case_rpc')]
+    public function snake_case_rpc(PBClass $request, Context $context = new Context()): PBClass;
+
+    /**
+     * @throws ConnectException
+     */
+    #[Procedure('Get')]
+    public function get(PBClass $request, Context $context = new Context()): PBClass;
+
+    /**
+     * @throws ConnectException
+     */
+    #[Procedure('GetMethod')]
+    public function getMethod(PBClass $request, Context $context = new Context()): PBClass;
 
     /**
      * Old returns nothing useful.

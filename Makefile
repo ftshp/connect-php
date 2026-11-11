@@ -12,6 +12,7 @@ check:
 	vendor/bin/composer-dependency-analyser
 	vendor/bin/php-cs-fixer check --diff
 	vendor/bin/phpstan analyse $(PHPSTAN_CONF)
+	vendor/bin/phpstan analyse -c phpstan-generated.neon
 	vendor/bin/phpunit
 	go vet ./... && test -z "$$(gofmt -l .)" && go test ./...
 
@@ -23,6 +24,7 @@ test:
 
 stan:
 	vendor/bin/phpstan analyse $(PHPSTAN_CONF)
+	vendor/bin/phpstan analyse -c phpstan-generated.neon
 
 cs:
 	vendor/bin/php-cs-fixer check --diff

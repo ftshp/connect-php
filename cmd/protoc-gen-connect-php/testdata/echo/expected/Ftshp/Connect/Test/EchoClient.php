@@ -18,40 +18,25 @@ final class EchoClient implements EchoInterface
 
     public function echo(EchoRequest $request, Context $context = new Context()): EchoResponse
     {
-        return $this->client->unary(self::echoMethod(), $request, $context);
-    }
+        /** @var MethodDescriptor<EchoRequest, EchoResponse> $method */
+        static $method = new MethodDescriptor('ftshp.connect.test.Echo', 'Echo', 'echo', EchoRequest::class, EchoResponse::class, Idempotency::Unknown);
 
-    /** @return MethodDescriptor<EchoRequest, EchoResponse> */
-    private static function echoMethod(): MethodDescriptor
-    {
-        static $method = null;
-
-        return $method ??= new MethodDescriptor('ftshp.connect.test.Echo', 'Echo', 'echo', EchoRequest::class, EchoResponse::class, Idempotency::Unknown);
+        return $this->client->unary($method, $request, $context);
     }
 
     public function peek(EchoRequest $request, Context $context = new Context()): EchoResponse
     {
-        return $this->client->unary(self::peekMethod(), $request, $context);
-    }
+        /** @var MethodDescriptor<EchoRequest, EchoResponse> $method */
+        static $method = new MethodDescriptor('ftshp.connect.test.Echo', 'Peek', 'peek', EchoRequest::class, EchoResponse::class, Idempotency::NoSideEffects);
 
-    /** @return MethodDescriptor<EchoRequest, EchoResponse> */
-    private static function peekMethod(): MethodDescriptor
-    {
-        static $method = null;
-
-        return $method ??= new MethodDescriptor('ftshp.connect.test.Echo', 'Peek', 'peek', EchoRequest::class, EchoResponse::class, Idempotency::NoSideEffects);
+        return $this->client->unary($method, $request, $context);
     }
 
     public function fail(FailRequest $request, Context $context = new Context()): PBEmpty
     {
-        return $this->client->unary(self::failMethod(), $request, $context);
-    }
+        /** @var MethodDescriptor<FailRequest, PBEmpty> $method */
+        static $method = new MethodDescriptor('ftshp.connect.test.Echo', 'Fail', 'fail', FailRequest::class, PBEmpty::class, Idempotency::Unknown);
 
-    /** @return MethodDescriptor<FailRequest, PBEmpty> */
-    private static function failMethod(): MethodDescriptor
-    {
-        static $method = null;
-
-        return $method ??= new MethodDescriptor('ftshp.connect.test.Echo', 'Fail', 'fail', FailRequest::class, PBEmpty::class, Idempotency::Unknown);
+        return $this->client->unary($method, $request, $context);
     }
 }
