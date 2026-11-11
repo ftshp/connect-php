@@ -172,7 +172,7 @@ final class RoundTripTest extends TestCase
             public function __construct(private readonly EchoClient $downstream) {}
 
             #[\Override]
-            public function echo(EchoRequest $request, Context $context): EchoResponse
+            public function echo(EchoRequest $request, Context $context = new Context()): EchoResponse
             {
                 $forwarded = new Context(
                     new Headers(['x-token' => $context->requestHeaders->get('x-token') ?? '']),
@@ -185,13 +185,13 @@ final class RoundTripTest extends TestCase
             }
 
             #[\Override]
-            public function peek(EchoRequest $request, Context $context): EchoResponse
+            public function peek(EchoRequest $request, Context $context = new Context()): EchoResponse
             {
                 return new EchoResponse();
             }
 
             #[\Override]
-            public function fail(FailRequest $request, Context $context): PBEmpty
+            public function fail(FailRequest $request, Context $context = new Context()): PBEmpty
             {
                 return new PBEmpty();
             }

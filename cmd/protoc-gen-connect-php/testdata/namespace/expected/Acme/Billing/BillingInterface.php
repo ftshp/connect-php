@@ -25,11 +25,11 @@ interface BillingInterface
      * @throws ConnectException
      */
     #[Procedure('Charge')]
-    public function charge(Money $request, Context $context): PBInvoice;
+    public function charge(Money $request, Context $context = new Context()): PBInvoice;
 
     /**
      * @throws ConnectException
      */
     #[Procedure('Lookup', Idempotency::Idempotent)]
-    public function lookup(\Acme\Common\Context $request, Context $context): PBInvoice;
+    public function lookup(\Acme\Common\Context $request, Context $context = new Context()): PBInvoice;
 }

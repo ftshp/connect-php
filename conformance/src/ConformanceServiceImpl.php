@@ -35,19 +35,19 @@ final readonly class ConformanceServiceImpl implements ConformanceServiceInterfa
     public function __construct(private ?string $getQuery = null) {}
 
     #[\Override]
-    public function unary(UnaryRequest $request, Context $context): UnaryResponse
+    public function unary(UnaryRequest $request, Context $context = new Context()): UnaryResponse
     {
         return new UnaryResponse(['payload' => $this->respond($request, $request->getResponseDefinition(), $context)]);
     }
 
     #[\Override]
-    public function unimplemented(UnimplementedRequest $request, Context $context): UnimplementedResponse
+    public function unimplemented(UnimplementedRequest $request, Context $context = new Context()): UnimplementedResponse
     {
         throw new ConnectException(Code::Unimplemented, 'unimplemented');
     }
 
     #[\Override]
-    public function idempotentUnary(IdempotentUnaryRequest $request, Context $context): IdempotentUnaryResponse
+    public function idempotentUnary(IdempotentUnaryRequest $request, Context $context = new Context()): IdempotentUnaryResponse
     {
         return new IdempotentUnaryResponse(['payload' => $this->respond($request, $request->getResponseDefinition(), $context)]);
     }

@@ -27,7 +27,7 @@ interface {{.Name}}Interface
 {{- end}}
      */
     #[Procedure('{{$m.Name}}'{{if ne $m.Idempotency "Unknown"}}, Idempotency::{{$m.Idempotency}}{{end}})]
-    public function {{$m.PHPName}}({{$m.Input}} $request, Context $context): {{$m.Output}};
+    public function {{$m.PHPName}}({{$m.Input}} $request, Context $context = new Context()): {{$m.Output}};
 {{- end}}
 }
 {{end -}}

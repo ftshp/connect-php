@@ -18,7 +18,7 @@ use Google\Protobuf\Value;
 final class EchoService implements EchoInterface
 {
     #[\Override]
-    public function echo(EchoRequest $request, Context $context): EchoResponse
+    public function echo(EchoRequest $request, Context $context = new Context()): EchoResponse
     {
         $headers = [];
         foreach ($context->requestHeaders->toArray() as $name => $values) {
@@ -37,13 +37,13 @@ final class EchoService implements EchoInterface
     }
 
     #[\Override]
-    public function peek(EchoRequest $request, Context $context): EchoResponse
+    public function peek(EchoRequest $request, Context $context = new Context()): EchoResponse
     {
         return new EchoResponse(['text' => $request->getText()]);
     }
 
     #[\Override]
-    public function fail(FailRequest $request, Context $context): PBEmpty
+    public function fail(FailRequest $request, Context $context = new Context()): PBEmpty
     {
         if ($request->getCode() === 'boom') {
             throw new \RuntimeException('boom');
