@@ -2,7 +2,7 @@
 
 The library has no Symfony bundle. `Server` is a PSR-15 request handler and `Client` sits on any PSR-18 client, so a Symfony application needs a controller, a few service definitions and, for the client, an HTTP client it already has.
 
-The examples use a `Stock` service in the `acme.stock` proto package, generated into the `Acme\Stock` namespace as `StockInterface` and `StockClient`. They need these packages:
+The examples use the `GreetService` from the README, in the `greet.v1` proto package, generated into the `Greet\V1` namespace as `GreetServiceInterface` and `GreetServiceClient`. They need these packages:
 
 ```sh
 composer require ftshp/connect nyholm/psr7 symfony/psr-http-message-bridge symfony/http-client
@@ -62,14 +62,14 @@ The definitions below go in `config/services.php`. They load the application's c
 
 declare(strict_types=1);
 
-use Acme\Stock\StockClient;
-use Acme\Stock\StockInterface;
 use App\Connect\ErrorLog;
 use App\Connect\RetryReads;
 use App\Connect\TokenAuth;
-use App\Stock\StockService;
+use App\Greet\Greeter;
 use Ftshp\Connect\Client;
 use Ftshp\Connect\Server;
+use Greet\V1\GreetServiceClient;
+use Greet\V1\GreetServiceInterface;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Symfony\Bridge\PsrHttpMessage\Factory\HttpFoundationFactory;
 use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
@@ -95,33 +95,30 @@ return static function (ContainerConfigurator $container): void {
     $services->set(TokenAuth::class)->args([env('CONNECT_TOKEN')]);
 
     $services->set(Server::class)
-        ->args([
-            service(Psr17Factory::class),
-            service(Psr17Factory::class),
-            [service(TokenAuth::class), service(ErrorLog::class)],
-        ])
-        ->call('register', [StockInterface::class, service(StockService::class)]);
+        ->args([service(Psr17Factory::class), service(Psr17Factory::class)])
+        ->arg('$interceptors', [service(TokenAuth::class), service(ErrorLog::class)])
+        ->call('register', [GreetServiceInterface::class, service(Greeter::class)]);
 
-    $services->set('app.stock.http_client', Psr18Client::class)
+    $services->set('app.greet.http_client', Psr18Client::class)
         ->args([service('http_client'), service(Psr17Factory::class), service(Psr17Factory::class)]);
 
-    $services->set('app.stock.connect_client', Client::class)
+    $services->set('app.greet.connect_client', Client::class)
         ->args([
-            service('app.stock.http_client'),
+            service('app.greet.http_client'),
             service(Psr17Factory::class),
             service(Psr17Factory::class),
-            env('STOCK_URL'),
+            env('GREET_URL'),
         ])
         ->arg('$interceptors', [service(RetryReads::class)])
         ->arg('$timeoutMs', 2000);
 
-    $services->set(StockClient::class)->args([service('app.stock.connect_client')]);
+    $services->set(GreetServiceClient::class)->args([service('app.greet.connect_client')]);
 };
 ```
 
-A class that needs the stock service asks for `StockClient`, or for `StockInterface` if you alias the interface to the client. Calls go out through Symfony's HttpClient, so the `framework.http_client` configuration applies to them.
+A class that needs the greeting service asks for `GreetServiceClient`, or for `GreetServiceInterface` if you alias the interface to the client. Calls go out through Symfony's HttpClient, so the `framework.http_client` configuration applies to them. Options of `Server` and `Client` are set by name with `arg('$name', ...)`, because only their names are covered by the [compatibility promise](compatibility.md).
 
-When the application already uses HttplugBundle, pass one of its clients instead of the `Psr18Client`, for example `service('httplug.client.stock')`. Its plugins for authentication headers, logging and retries keep working because they sit inside the PSR-18 client.
+When the application already uses HttplugBundle, pass one of its clients instead of the `Psr18Client`, for example `service('httplug.client.greet')`. Its plugins for authentication headers, logging and retries keep working because they sit inside the PSR-18 client.
 
 ## Authentication
 
@@ -161,7 +158,7 @@ The client sends the token in the call's `Context`:
 
 ```php
 $context = new Context(new Headers(['authorization' => 'Bearer ' . $token]));
-$stock->availabilityGet($request, $context);
+$greeter->greet($request, $context);
 ```
 
 With HttplugBundle, the bundle's `authentication` plugin of type `bearer` does the same for every call.
@@ -301,13 +298,13 @@ final readonly class ConnectTimeoutPlugin implements Plugin
 The plugin sends the request itself instead of calling `$next`, so it has to be the last plugin in the list, and `$transport` should be the client the plugin chain would otherwise reach. With HttplugBundle that is the client the `httplug.factory.symfony` factory builds:
 
 ```php
-$services->set(ConnectTimeoutPlugin::class)->args([service('httplug.client.stock.client')]);
+$services->set(ConnectTimeoutPlugin::class)->args([service('httplug.client.greet.client')]);
 ```
 
 ```yaml
 httplug:
     clients:
-        stock:
+        greet:
             factory: 'httplug.factory.symfony'
             config:
                 timeout: 5
