@@ -66,7 +66,7 @@ final class CompatClient
         foreach ($request->getRequestHeaders() as $header) {
             $headers[$header->getName()] = [...$headers[$header->getName()] ?? [], ...$header->getValue()];
         }
-        $context = new Context(Headers::fromPsr($headers), $request->hasTimeoutMs() ? $request->getTimeoutMs() : null);
+        $context = new Context(Headers::fromPsr($headers), $request->hasTimeoutMs() === true ? $request->getTimeoutMs() : null);
 
         $result = new ClientResponseResult();
         try {
