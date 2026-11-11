@@ -93,7 +93,8 @@ final readonly class ConformanceServiceImpl implements ConformanceServiceInterfa
     {
         $details = [];
         foreach ($error->getDetails() as $detail) {
-            $details[] = new ErrorDetail(array_last(explode('/', $detail->getTypeUrl())), $detail->getValue());
+            $parts = explode('/', $detail->getTypeUrl());
+            $details[] = new ErrorDetail(end($parts), $detail->getValue());
         }
         $details[] = ErrorDetail::fromMessage($info);
         $name = ConformanceCode::name($error->getCode());

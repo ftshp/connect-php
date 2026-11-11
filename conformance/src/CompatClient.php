@@ -135,7 +135,8 @@ final class CompatClient
     private static function unpack(Any $any, Message $into): Message
     {
         $expected = DescriptorPool::getGeneratedPool()->getDescriptorByClassName($into::class)->getFullName();
-        $actual = array_last(explode('/', $any->getTypeUrl()));
+        $parts = explode('/', $any->getTypeUrl());
+        $actual = end($parts);
         if ($actual !== $expected) {
             throw new \InvalidArgumentException(\sprintf('expected a %s request, got %s', $expected, $actual));
         }

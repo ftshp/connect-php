@@ -2,12 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0.0, a minor release can contain breaking changes and a patch release contains only backward compatible fixes.
 
-## Unreleased
+## [Unreleased]
 
 ### Added
 
+- Support for PHP 8.4. CI runs the tests and the conformance suite on PHP 8.4 and 8.5, each with the protobuf C extension and with the pure PHP runtime.
+- `composer.json` suggests `ext-protobuf`, whose version should match `google/protobuf`.
 - `Headers` is iterable. `foreach ($headers as $name => $values)` yields every header with raw values, including `-bin` names, for which `toArray()` returns base64.
 - `ConnectException` takes its metadata as an optional fifth constructor argument, `metadata:`.
 - The plugin accepts proto files that use editions, up to edition 2024. protoc and buf refused to run it on them before.
@@ -40,7 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The copy that `ConnectException::withMetadata()` returns keeps the file, line and trace of the original exception. The copy of an error that a `Client` received is still treated as received, so the server does not forward its metadata.
 - Reading `Context::$method` on a `Context` that no call has started throws a `\LogicException` that says so, instead of an `\Error` about an uninitialized property. The property keeps its `MethodDescriptor` type.
 
-## 0.1.0 - 2026-11-02
+## [0.1.0] - 2026-11-02
 
 ### Added
 
@@ -59,3 +61,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - gRPC and gRPC-Web are not supported.
 - A synchronous PSR-18 client cannot cancel a call that is in flight.
 - Four `cancel-after-close-send` conformance cases fail for that reason.
+
+[Unreleased]: https://github.com/ftshp/connect-php/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/ftshp/connect-php/releases/tag/v0.1.0
