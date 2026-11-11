@@ -21,12 +21,23 @@ final class Context
 
     public function __construct(
         public readonly Headers $requestHeaders = new Headers(),
-        public ?int $timeoutMs = null,
+        public ?int $timeoutMs = null {
+            set {
+                $restart = $this->startedMethod !== null && $value !== $this->timeoutMs;
+                $this->timeoutMs = $value;
+                if ($restart) {
+                    $this->startDeadline();
+                }
+            }
+        },
     ) {
         $this->responseHeaders = new Headers();
         $this->responseTrailers = new Headers();
     }
 
+    /**
+     * @phpstan-impure
+     */
     public function remainingMs(): ?int
     {
         if ($this->deadline === null) {
@@ -37,13 +48,18 @@ final class Context
     }
 
     /**
-     * @internal sets the method and starts the timer when a call or an attempt starts
+     * @internal sets the method and starts the timer when a call starts, so retries share one deadline
      *
      * @param MethodDescriptor<Message, Message> $method
      */
     public function begin(MethodDescriptor $method): void
     {
         $this->startedMethod = $method;
+        $this->startDeadline();
+    }
+
+    private function startDeadline(): void
+    {
         $this->deadline = $this->timeoutMs === null ? null : microtime(true) + $this->timeoutMs / 1000;
     }
 }

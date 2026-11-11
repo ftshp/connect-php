@@ -239,4 +239,14 @@ final class ServerGetTest extends TestCase
         self::assertSame(200, $this->get(self::PEEK, GetQuery::encode('json', '{}', null), server: $server)->getStatusCode());
         self::assertSame(400, $this->get(self::PEEK, 'encoding=json&message=%7B%7D', server: $server)->getStatusCode());
     }
+
+    #[Test]
+    public function getWithWrongConnectParameterIsRejectedWhenNotRequired(): void
+    {
+        $response = $this->get(self::PEEK, 'connect=v2&encoding=json&message=%7B%7D');
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertSame(['code' => 'invalid_argument', 'message' => 'connect must be "v1": got "v2"'], $this->json($response));
+        self::assertSame(200, $this->get(self::PEEK, 'encoding=json&message=%7B%7D')->getStatusCode());
+    }
 }

@@ -260,7 +260,7 @@ final readonly class RetryReads implements Interceptor
 }
 ```
 
-Each attempt gets the full timeout from the `Context`, so the worst case is about `attempts` times the timeout plus the delays.
+The attempts share the deadline of the call. Each one sends the time that is left in `Connect-Timeout-Ms`, and once the deadline has passed the next attempt fails with `deadline_exceeded` without sending a request. A call with retries takes at most about the timeout plus one delay.
 
 ## Applying the timeout to the transport
 

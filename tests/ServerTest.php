@@ -182,12 +182,25 @@ final class ServerTest extends TestCase
         $response = $this->post(self::ECHO, 'application/proto', $this->proto('a'), ['Connect-Protocol-Version' => '2'], $server);
         self::assertSame(400, $response->getStatusCode());
         self::assertSame(
-            ['code' => 'invalid_argument', 'message' => 'unsupported Connect-Protocol-Version: must be 1'],
+            ['code' => 'invalid_argument', 'message' => 'Connect-Protocol-Version must be "1": got "2"'],
             $this->json($response),
         );
 
         $response = $this->post(self::ECHO, 'application/proto', $this->proto('a'), ['Connect-Protocol-Version' => '1'], $server);
         self::assertSame(200, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function wrongProtocolVersionIsRejectedWhenNotRequired(): void
+    {
+        $response = $this->post(self::ECHO, 'application/proto', $this->proto('a'), ['Connect-Protocol-Version' => '2']);
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertSame(
+            ['code' => 'invalid_argument', 'message' => 'Connect-Protocol-Version must be "1": got "2"'],
+            $this->json($response),
+        );
+        self::assertSame(200, $this->post(self::ECHO, 'application/proto', $this->proto('a'))->getStatusCode());
     }
 
     #[Test]
@@ -218,12 +231,55 @@ final class ServerTest extends TestCase
     #[Test]
     public function invalidTimeoutIs400(): void
     {
-        foreach (['12345678901', '0', 'abc', '-5'] as $value) {
+        foreach (['12345678901', 'abc', '-5'] as $value) {
             $response = $this->post(self::ECHO, 'application/proto', $this->proto('a'), ['Connect-Timeout-Ms' => $value]);
 
             self::assertSame(400, $response->getStatusCode(), $value);
             self::assertSame(['code' => 'invalid_argument', 'message' => 'invalid timeout'], $this->json($response));
         }
+    }
+
+    #[Test]
+    public function zeroTimeoutIsDeadlineExceededWithoutRunningTheHandler(): void
+    {
+        $interceptor = new class implements Interceptor {
+            public bool $ran = false;
+
+            #[\Override]
+            public function intercept(UnaryRequest $request, \Closure $next): Message
+            {
+                $this->ran = true;
+
+                return $next($request);
+            }
+        };
+
+        $response = $this->post(self::ECHO, 'application/proto', $this->proto('a'), ['Connect-Timeout-Ms' => '0'], $this->server([$interceptor]));
+
+        self::assertSame(504, $response->getStatusCode());
+        self::assertSame(['code' => 'deadline_exceeded', 'message' => 'deadline exceeded'], $this->json($response));
+        self::assertTrue($interceptor->ran);
+        self::assertFalse($response->hasHeader('x-echoed'));
+    }
+
+    #[Test]
+    public function deadlinePassedInInterceptorsSkipsTheHandler(): void
+    {
+        $slow = new class implements Interceptor {
+            #[\Override]
+            public function intercept(UnaryRequest $request, \Closure $next): Message
+            {
+                usleep(5000);
+
+                return $next($request);
+            }
+        };
+
+        $response = $this->post(self::ECHO, 'application/proto', $this->proto('a'), ['Connect-Timeout-Ms' => '1'], $this->server([$slow]));
+
+        self::assertSame(504, $response->getStatusCode());
+        self::assertSame('deadline_exceeded', $this->json($response)['code']);
+        self::assertFalse($response->hasHeader('x-echoed'));
     }
 
     #[Test]
@@ -351,6 +407,18 @@ final class ServerTest extends TestCase
     }
 
     #[Test]
+    public function encodingRefusedWithZeroQualityIsNotUsed(): void
+    {
+        foreach (['gzip;q=0', 'gzip; Q=0.000', 'gzip;q=0, identity', 'gzip;level=1;q=0'] as $accept) {
+            $response = $this->post(self::ECHO, 'application/proto', $this->proto(str_repeat('a', 2048)), ['Accept-Encoding' => $accept]);
+
+            self::assertFalse($response->hasHeader('content-encoding'), $accept);
+        }
+        $response = $this->post(self::ECHO, 'application/proto', $this->proto(str_repeat('a', 2048)), ['Accept-Encoding' => 'gzip;q=0.5']);
+        self::assertSame('gzip', $response->getHeaderLine('content-encoding'));
+    }
+
+    #[Test]
     public function smallResponseIsNotCompressed(): void
     {
         $response = $this->post(self::ECHO, 'application/proto', $this->proto('hello'), ['Accept-Encoding' => 'gzip']);
@@ -416,6 +484,93 @@ final class ServerTest extends TestCase
         self::assertSame('1', $response->getHeaderLine('x-echoed'));
         self::assertSame('t', $response->getHeaderLine('trailer-x-trailer'));
         self::assertSame(['x-custom' => 'v'], iterator_to_array($this->echoResponse((string) $response->getBody())->getHeaders()));
+    }
+
+    #[Test]
+    public function errorMetadataIsSentAsHeaders(): void
+    {
+        $reject = new class implements Interceptor {
+            #[\Override]
+            public function intercept(UnaryRequest $request, \Closure $next): Message
+            {
+                $request->context->responseHeaders->set('x-reason', 'context');
+                $request->context->responseTrailers->set('x-trailer', 't');
+                $e = new ConnectException(Code::NotFound, 'gone', metadata: new Headers(['x-reason' => 'error', 'x-id-bin' => "\x00\x01"]));
+                $e->metadata()->add('x-added', '1');
+
+                throw $e;
+            }
+        };
+
+        $response = $this->post(self::ECHO, 'application/proto', $this->proto('a'), server: $this->server([$reject]));
+
+        self::assertSame(404, $response->getStatusCode());
+        self::assertSame(['context', 'error'], $response->getHeader('x-reason'));
+        self::assertSame('AAE', $response->getHeaderLine('x-id-bin'));
+        self::assertSame('1', $response->getHeaderLine('x-added'));
+        self::assertSame('t', $response->getHeaderLine('trailer-x-trailer'));
+        self::assertSame(['code' => 'not_found', 'message' => 'gone'], $this->json($response));
+    }
+
+    #[Test]
+    public function errorMetadataCannotReplaceProtocolHeaders(): void
+    {
+        $reject = new class implements Interceptor {
+            #[\Override]
+            public function intercept(UnaryRequest $request, \Closure $next): Message
+            {
+                throw new ConnectException(Code::NotFound, metadata: Headers::fromPsr([
+                    'content-type' => ['text/html'],
+                    'content-length' => ['3'],
+                    'content-encoding' => ['gzip'],
+                    'transfer-encoding' => ['chunked'],
+                    'accept-encoding' => ['br'],
+                    'connect-timeout-ms' => ['1'],
+                    'grpc-status' => ['0'],
+                    'grpc-message' => ['ok'],
+                    'grpc-status-details-bin' => ['AA'],
+                    'grpc-timeout' => ['1S'],
+                    'grpc-encoding' => ['gzip'],
+                    'grpc-accept-encoding' => ['gzip'],
+                    'trailer-x-forged' => ['1'],
+                    'x-bad' => ["a\x00b"],
+                    'bad name' => ['1'],
+                    'x-kept' => ['1'],
+                ]));
+            }
+        };
+
+        $response = $this->post(self::ECHO, 'application/proto', $this->proto('a'), server: $this->server([$reject]));
+
+        self::assertSame(404, $response->getStatusCode());
+        self::assertSame('application/json', $response->getHeaderLine('content-type'));
+        foreach ([
+            'content-length', 'content-encoding', 'transfer-encoding', 'accept-encoding', 'connect-timeout-ms',
+            'grpc-status', 'grpc-message', 'grpc-status-details-bin', 'grpc-timeout', 'grpc-encoding', 'grpc-accept-encoding',
+            'trailer-x-forged', 'x-bad', 'bad name',
+        ] as $name) {
+            self::assertFalse($response->hasHeader($name), $name);
+        }
+        self::assertSame('1', $response->getHeaderLine('x-kept'));
+        self::assertSame(['code' => 'not_found'], $this->json($response));
+    }
+
+    #[Test]
+    public function metadataOfAReceivedErrorIsNotForwarded(): void
+    {
+        $forward = new class implements Interceptor {
+            #[\Override]
+            public function intercept(UnaryRequest $request, \Closure $next): Message
+            {
+                throw ConnectException::received(Code::Unavailable, 'upstream down', [], new Headers(['set-cookie' => 'upstream=1']));
+            }
+        };
+
+        $response = $this->post(self::ECHO, 'application/proto', $this->proto('a'), server: $this->server([$forward]));
+
+        self::assertSame(503, $response->getStatusCode());
+        self::assertFalse($response->hasHeader('set-cookie'));
+        self::assertSame(['code' => 'unavailable', 'message' => 'upstream down'], $this->json($response));
     }
 
     #[Test]

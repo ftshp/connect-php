@@ -24,6 +24,10 @@ use Psr\Http\Server\RequestHandlerInterface;
 final class Server implements RequestHandlerInterface
 {
     private const array BODY_HEADERS = ['content-encoding', 'content-length', 'transfer-encoding'];
+    private const array PROTOCOL_HEADERS = [
+        ...self::BODY_HEADERS, 'content-type', 'accept-encoding', 'date', 'host', 'trailer', 'user-agent',
+        'grpc-status', 'grpc-message', 'grpc-status-details-bin', 'grpc-timeout', 'grpc-encoding', 'grpc-accept-encoding',
+    ];
 
     /** @var array<string, array{MethodDescriptor<Message, Message>, \Closure(Message, Context): Message}> */
     private array $procedures = [];
@@ -94,9 +98,7 @@ final class Server implements RequestHandlerInterface
 
         $context = null;
         try {
-            if ($this->requireProtocolHeader) {
-                $this->checkProtocol($request, $isGet);
-            }
+            $this->checkProtocol($request, $isGet);
             $query = $isGet ? GetQuery::parse($request->getQueryParams()) : null;
             $codec = $query !== null
                 ? $this->codecs[$query['encoding']] ?? null
@@ -130,7 +132,9 @@ final class Server implements RequestHandlerInterface
             );
             $call = Chain::build(
                 $this->interceptors,
-                static fn(UnaryRequest $unary): Message => $handler($unary->message(), $unary->context),
+                static fn(UnaryRequest $unary): Message => $unary->context->remainingMs() === 0
+                    ? throw new ConnectException(Code::DeadlineExceeded, 'deadline exceeded')
+                    : $handler($unary->message(), $unary->context),
             );
 
             return $this->success($call($unary), $codec, $context, $request);
@@ -141,14 +145,15 @@ final class Server implements RequestHandlerInterface
 
     private function checkProtocol(ServerRequestInterface $request, bool $isGet): void
     {
-        if ($isGet && ($request->getQueryParams()['connect'] ?? null) !== 'v1') {
-            throw new ConnectException(Code::InvalidArgument, 'missing required query parameter: connect=v1');
+        [$name, $expected] = $isGet ? ['connect', 'v1'] : ['Connect-Protocol-Version', '1'];
+        $version = $isGet ? $request->getQueryParams()['connect'] ?? '' : $request->getHeaderLine($name);
+        if ($version === '' && $this->requireProtocolHeader) {
+            throw new ConnectException(Code::InvalidArgument, $isGet ? 'missing required query parameter: connect=v1' : 'missing required header: Connect-Protocol-Version');
         }
-        if (!$isGet && !$request->hasHeader('Connect-Protocol-Version')) {
-            throw new ConnectException(Code::InvalidArgument, 'missing required header: Connect-Protocol-Version');
-        }
-        if (!$isGet && $request->getHeaderLine('Connect-Protocol-Version') !== '1') {
-            throw new ConnectException(Code::InvalidArgument, 'unsupported Connect-Protocol-Version: must be 1');
+        if ($version !== '' && $version !== $expected) {
+            $got = json_encode($version, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES);
+
+            throw new ConnectException(Code::InvalidArgument, \sprintf('%s must be "%s": got %s', $name, $expected, $got));
         }
     }
 
@@ -158,7 +163,7 @@ final class Server implements RequestHandlerInterface
             return null;
         }
         $value = $request->getHeaderLine('Connect-Timeout-Ms');
-        if (preg_match('/^\d{1,10}\z/', $value) !== 1 || (int) $value === 0) {
+        if (preg_match('/^\d{1,10}\z/', $value) !== 1) {
             throw new ConnectException(Code::InvalidArgument, 'invalid timeout');
         }
 
@@ -214,8 +219,10 @@ final class Server implements RequestHandlerInterface
     private function responseCompression(ServerRequestInterface $request): ?Compression
     {
         foreach (explode(',', $request->getHeaderLine('Accept-Encoding')) as $token) {
-            $name = strtolower(trim(explode(';', $token, 2)[0]));
-            if (isset($this->compression[$name])) {
+            $parameters = explode(';', $token);
+            $name = strtolower(trim(array_shift($parameters)));
+            $refused = preg_grep('/^\s*q\s*=\s*0(\.0{0,3})?\s*$/i', $parameters) !== [];
+            if (!$refused && isset($this->compression[$name])) {
                 return $this->compression[$name];
             }
         }
@@ -228,6 +235,9 @@ final class Server implements RequestHandlerInterface
         $response = $this->responseFactory->createResponse($status ?? $e->code()->httpStatus());
         if ($context !== null) {
             $response = $this->withMetadata($response, $context, skipRejected: true);
+        }
+        if (!$e->isWireError()) {
+            $response = $this->withErrorMetadata($response, $e->metadata());
         }
 
         return $response
@@ -248,6 +258,22 @@ final class Server implements RequestHandlerInterface
                 if (!$skipRejected) {
                     throw $e;
                 }
+            }
+        }
+
+        return $response;
+    }
+
+    private function withErrorMetadata(ResponseInterface $response, Headers $metadata): ResponseInterface
+    {
+        foreach ($metadata as $name => $values) {
+            if (\in_array($name, self::PROTOCOL_HEADERS, true) || str_starts_with($name, 'trailer-')) {
+                continue;
+            }
+            try {
+                $valid = new Headers([$name => $values]);
+                $response = $response->withAddedHeader($name, $valid->toArray()[$name]);
+            } catch (\InvalidArgumentException) {
             }
         }
 

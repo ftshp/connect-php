@@ -86,13 +86,9 @@ final class Client
     private function send(UnaryRequest $unary): Message
     {
         $context = $unary->context;
-        if ($context->timeoutMs !== null && $context->timeoutMs <= 0) {
-            throw new ConnectException(Code::DeadlineExceeded, 'timeout has already passed');
+        if ($context->remainingMs() === 0) {
+            throw new ConnectException(Code::DeadlineExceeded, 'deadline exceeded before sending the request');
         }
-        if ($context->timeoutMs > 9_999_999_999) {
-            throw new \InvalidArgumentException('timeoutMs has more than 10 digits');
-        }
-        $context->begin($unary->method);
         $request = $this->buildRequest($unary);
         try {
             $response = $this->http->sendRequest($request);
@@ -128,8 +124,9 @@ final class Client
         if ($this->acceptCompression !== []) {
             $request = $request->withHeader('Accept-Encoding', implode(', ', array_keys($this->acceptCompression)));
         }
-        if ($context->timeoutMs !== null) {
-            $request = $request->withHeader('Connect-Timeout-Ms', (string) $context->timeoutMs);
+        $remainingMs = $context->remainingMs();
+        if ($remainingMs !== null && $remainingMs <= 9_999_999_999) {
+            $request = $request->withHeader('Connect-Timeout-Ms', (string) $remainingMs);
         }
         if ($get) {
             return $request->withoutHeader('Content-Type');
@@ -167,8 +164,8 @@ final class Client
             $metadata = Headers::fromPsr($headers);
 
             throw $compression === false
-                ? $this->statusError($response->getStatusCode(), $body, $metadata)
-                : $this->error($response->getStatusCode(), $contentType, $this->decompress($body, $compression), $metadata);
+                ? $this->statusError($response, '', $metadata)
+                : $this->error($response, $this->decompress($body, $compression), $metadata);
         }
         $mediaType = ContentType::mediaType($contentType);
         if ($mediaType !== 'application/' . $this->codec->name()) {
@@ -211,19 +208,27 @@ final class Client
         return $body;
     }
 
-    private function error(int $status, string $contentType, string $body, Headers $metadata): ConnectException
+    private function error(ResponseInterface $response, string $body, Headers $metadata): ConnectException
     {
-        $error = ContentType::mediaType($contentType) === 'application/json' ? ErrorBody::decode($body, $metadata, Code::fromHttpStatus($status)) : null;
+        $error = ContentType::mediaType($response->getHeaderLine('Content-Type')) === 'application/json'
+            ? ErrorBody::decode($body, $metadata, Code::fromHttpStatus($response->getStatusCode()))
+            : null;
 
-        return $error ?? $this->statusError($status, $body, $metadata);
+        return $error ?? $this->statusError($response, $body, $metadata);
     }
 
-    private function statusError(int $status, string $body, Headers $metadata): ConnectException
+    private function statusError(ResponseInterface $response, string $body, Headers $metadata): ConnectException
     {
-        $snippet = self::utf8Prefix($body, 1024);
+        $message = rtrim('HTTP ' . $response->getStatusCode() . ' ' . $response->getReasonPhrase());
+        $isText = \in_array(ContentType::mediaType($response->getHeaderLine('Content-Type')), ['text/plain', 'application/json'], true);
+        $snippet = $isText ? self::utf8Prefix($body, 1024) : '';
 
-        return new ConnectException(Code::fromHttpStatus($status), 'HTTP ' . $status . ($snippet !== '' ? ': ' . $snippet : ''))
-            ->withMetadata($metadata);
+        return ConnectException::received(
+            Code::fromHttpStatus($response->getStatusCode()),
+            $snippet === '' ? $message : $message . ': ' . $snippet,
+            [],
+            $metadata,
+        );
     }
 
     private static function utf8Prefix(string $text, int $maxBytes): string

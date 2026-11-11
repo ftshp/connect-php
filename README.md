@@ -237,6 +237,8 @@ $etag = $context->responseHeaders->get('etag');
 
 On the server the handler gets the same class. It reads what the client sent and sets `$context->responseHeaders` and `$context->responseTrailers`. `$context->remainingMs()` returns the time left before the deadline from `Connect-Timeout-Ms`, or `null` when the client sent none. `$context->method` is the `MethodDescriptor` of the call once the client or the server has started it. Reading it earlier throws a `\LogicException`.
 
+The deadline is set when the call starts, and again from that moment when an interceptor changes `timeoutMs`. On the client every attempt, including each retry an interceptor makes, sends the time left in `Connect-Timeout-Ms`, and an attempt that starts after the deadline fails with `deadline_exceeded` without sending a request. A timeout longer than 10 digits is not sent at all, as in connect-go. On the server a deadline that has passed before the handler runs, after slow interceptors or with `Connect-Timeout-Ms: 0`, ends the call with `deadline_exceeded` and the handler is not called. A handler that is already running is not interrupted; it can check `remainingMs()` and give up early.
+
 `Headers` names are case-insensitive and stored in lowercase. A name that ends in `-bin` holds raw bytes: `get()`, `all()`, `set()`, `add()` and `foreach` work with the bytes, and the library sends them as unpadded base64. `toArray()` returns the wire form, with those values in base64, ready for PSR-7 `withHeader()`, and `Headers::fromPsr()` reads the same form from PSR-7 `getHeaders()` and decodes it. To log or copy every header with raw values, iterate:
 
 ```php
@@ -257,19 +259,27 @@ $response = $greeter->greet(new GreetRequest(['name' => 'Jane']), $downstream);
 
 The client never sends `host`, `content-length`, `transfer-encoding`, `connection`, `te` or `content-encoding` from a `Context`. The server drops `content-encoding`, `content-length` and `transfer-encoding` from the response headers a handler sets, because it encodes the body itself.
 
-`Client` takes options as named arguments: `codec: new JsonCodec()`, `compression: new Gzip()` to compress requests, `acceptCompression` for the encodings accepted on responses, `useGet: true` to send `NO_SIDE_EFFECTS` calls as GET, `timeoutMs`, `maxResponseBytes`, `interceptors` and a path `prefix`. `Server` takes `interceptors`, `compression`, `compressMinBytes`, `maxRequestBytes`, `maxTimeoutMs`, `requireProtocolHeader` and `prefix`. Both sides limit messages to 4 MiB by default, counting the raw and the decompressed body.
+`Client` takes options as named arguments: `codec: new JsonCodec()`, `compression: new Gzip()` to compress requests, `acceptCompression` for the encodings accepted on responses, `useGet: true` to send `NO_SIDE_EFFECTS` calls as GET, `timeoutMs`, `maxResponseBytes`, `interceptors` and a path `prefix`. `Server` takes `interceptors`, `compression`, `compressMinBytes`, `maxRequestBytes`, `maxTimeoutMs`, `requireProtocolHeader` and `prefix`. With `requireProtocolHeader: true` the server rejects a POST without `Connect-Protocol-Version: 1` and a GET without `connect=v1`. A different value is rejected with `invalid_argument` whatever the option says. Both sides limit messages to 4 MiB by default, counting the raw and the decompressed body.
 
 `codec` takes any `Codec` implementation, and both sides take any `Compression`. `Codec::decode()` throws a `ConnectException` with `invalid_argument` for data it cannot parse. `Compression::decompress()` stops once the output passes the `$maxBytes` it is given, throws `resource_exhausted` when that happens and `invalid_argument` for corrupt input. Any other exception from an implementation becomes `unknown` with an empty message on the server and leaves `Client::unary()` unchanged.
 
 ## Errors
 
-Every failed RPC ends in a `ConnectException` with a `Code`. Invalid metadata you set yourself throws `\InvalidArgumentException` instead: a header name outside the allowed characters or with the `connect-` prefix, a text value with a control character, or a `timeoutMs` longer than 10 digits. A server handler throws a `ConnectException` to send its code and message to the client:
+Every failed RPC ends in a `ConnectException` with a `Code`. Invalid metadata you set yourself throws `\InvalidArgumentException` instead: a header name outside the allowed characters or with the `connect-` prefix, or a text value with a control character. A server handler throws a `ConnectException` to send its code and message to the client:
 
 ```php
 throw new ConnectException(Code::NotFound, 'no such user', [new ErrorInfo(['reason' => 'USER_DELETED'])]);
 ```
 
 The third argument is a list of error details, each of them a generated protobuf message. The example uses `Google\Rpc\ErrorInfo` from `google/common-protos`. Any other exception thrown by a handler reaches the client as `unknown` with an empty message, so exception messages stay on the server.
+
+Headers that belong to the error go in `metadata`. The server sends them as response headers after the ones in `$context->responseHeaders`:
+
+```php
+throw new ConnectException(Code::Unavailable, 'try again later', metadata: new Headers(['retry-after' => '5']));
+```
+
+`$e->metadata()` returns the same `Headers`, so a handler or interceptor can add to it before it throws. The server leaves out protocol headers such as `content-type`, `accept-encoding` and the `grpc-` status headers, names starting with `trailer-`, and any name or value `Headers` would reject. A `ConnectException` that a `Client` threw keeps its metadata to itself: a handler that rethrows it does not pass the upstream response headers on to its own caller.
 
 The client throws the same exception:
 
@@ -288,7 +298,7 @@ try {
 }
 ```
 
-`ErrorDetail::unpack($class)` returns `null` when the detail holds a different message type. `$e->metadata()` has the response headers and trailers of the failed call. A PSR-18 network error becomes `unavailable`, or `deadline_exceeded` once the call's timeout has passed, and any other PSR-18 exception becomes `unknown`.
+`ErrorDetail::unpack($class)` returns `null` when the detail holds a different message type. `$e->metadata()` has the response headers and trailers of the failed call. A response that is not a Connect error, such as an HTML page from a proxy, gets the code that the HTTP status maps to and the status line as its message, for example `HTTP 502 Bad Gateway`. A `text/plain` or JSON body is appended to the message, cut to 1 KiB. A PSR-18 network error becomes `unavailable`, or `deadline_exceeded` once the call's timeout has passed, and any other PSR-18 exception becomes `unknown`.
 
 ## Interceptors
 
